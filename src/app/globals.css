@@ -1,26 +1,187 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cream: #f6f1eb;
+  --color-sand: #ece4da;
+  --color-line: #ddd2c6;
+  --color-taupe: #a8927f;
+  --color-taupe-dark: #8f7a68;
+  --color-ink: #3b302a;
+  --color-muted: #7d6f65;
+  --font-sans: var(--font-jost);
+  --font-serif: var(--font-cormorant);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: #f6f1eb;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-jost), system-ui, sans-serif;
+  font-weight: 300;
+}
+
+.font-display {
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-taupe);
+  color: #fff;
+  padding: 0.8rem 2rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--color-taupe-dark);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-outline {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+.btn-outline:hover {
+  background: var(--color-sand);
+}
+
+.field {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--color-line);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  outline: none;
+}
+.field:focus {
+  border-color: var(--color-taupe);
+}
+
+/* Texture maille (bandeau « Les essentiels » et visuels sans photo) */
+.knit {
+  background-color: #d9cbb9;
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.28) 0 6px,
+      rgba(120, 95, 70, 0.12) 6px 12px
+    ),
+    repeating-linear-gradient(
+      65deg,
+      rgba(255, 255, 255, 0.18) 0 6px,
+      rgba(120, 95, 70, 0.1) 6px 12px
+    ),
+    radial-gradient(120% 90% at 20% 10%, #efe6d9 0%, #cdbba6 100%);
+}
+
+/* ------------------------------------------------ Touches modernes */
+
+.btn {
+  transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.25s;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn-dark {
+  background: var(--color-ink);
+}
+.btn-dark:hover {
+  background: #2a211c;
+}
+.btn-ghost {
+  background: rgba(246, 241, 235, 0.55);
+  color: var(--color-ink);
+  backdrop-filter: blur(6px);
+}
+.btn-ghost:hover {
+  background: var(--color-cream);
+}
+
+/* Lien avec petite flèche qui glisse au survol */
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--color-ink);
+  padding-bottom: 2px;
+}
+.link-arrow::after {
+  content: "→";
+  transition: transform 0.25s;
+}
+.link-arrow:hover::after {
+  transform: translateX(4px);
+}
+
+/* Apparition douce de la bannière */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.rise {
+  animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.rise-1 {
+  animation-delay: 0.08s;
+}
+.rise-2 {
+  animation-delay: 0.16s;
+}
+.rise-3 {
+  animation-delay: 0.24s;
+}
+
+/* Menu mobile */
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+.drawer {
+  animation: drawer-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .drawer {
+    animation: none;
+  }
+}
+
+::selection {
+  background: var(--color-taupe);
+  color: #fff;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.fade-in {
+  animation: fade-in 0.35s ease-out;
 }
