@@ -100,9 +100,11 @@ export const SHIPPING = {
     }
   >,
   /** Code enseigne Mondial Relay pour la carte des points relais.
-   *  « BDTEST » est le code de test public : remplacez-le par votre propre code
-   *  (fourni à l'ouverture d'un compte professionnel Mondial Relay). */
-  mondialRelayBrand: "BDTEST",
+   *  Réglez-le dans Vercel (variable NEXT_PUBLIC_MONDIAL_RELAY_BRAND) avec le code
+   *  fourni à l'ouverture de votre compte professionnel Mondial Relay.
+   *  À défaut, « BDTEST » (code de démonstration public) est utilisé. */
+  mondialRelayBrand:
+    process.env.NEXT_PUBLIC_MONDIAL_RELAY_BRAND?.trim() || "BDTEST",
 };
 
 export function shippingCents(method: ShippingMethod, subtotalCents: number) {
