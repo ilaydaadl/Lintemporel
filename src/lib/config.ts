@@ -69,7 +69,7 @@ export type ShippingMethod = "relay" | "home";
 
 export const SHIPPING = {
   /** Livraison offerte en point relais à partir de ce montant, en centimes. */
-  freeFromCents: 8000,
+  freeFromCents: 4500,
   methods: {
     relay: {
       label: "Point relais Mondial Relay",
