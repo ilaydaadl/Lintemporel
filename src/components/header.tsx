@@ -34,7 +34,7 @@ function navClass(active: boolean) {
 
 function DesktopNav({ pathname }: { pathname: string | null }) {
   return (
-    <nav className="hidden items-center gap-7 text-sm font-normal md:flex">
+    <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-normal lg:flex xl:gap-8">
       <Link href="/nouveautes" className={navClass(isActive(pathname, "/nouveautes"))}>
         Nouveautés
       </Link>
@@ -86,10 +86,13 @@ export function Header() {
 
   return (
     <>
-      <p className="eyebrow bg-ink px-4 py-2 text-center text-[0.65rem] text-cream">
-        Livraison offerte en point relais dès {SHIPPING.freeFromCents / 100} €
-        <span className="mx-2 opacity-50">·</span>
-        Paiement sécurisé
+      <p className="eyebrow bg-ink px-4 py-2 text-center text-[0.6rem] text-cream sm:text-[0.65rem]">
+        Livraison offerte <span className="hidden sm:inline">en point relais </span>
+        dès {SHIPPING.freeFromCents / 100} €
+        <span className="hidden md:inline">
+          <span className="mx-2 opacity-50">·</span>
+          Paiement sécurisé
+        </span>
       </p>
 
       <header className="sticky top-0 z-40 border-b border-line/70 bg-cream/85 backdrop-blur-md">
@@ -99,7 +102,7 @@ export function Header() {
               type="button"
               aria-label="Ouvrir le menu"
               aria-expanded={open}
-              className="-ml-2 p-2 md:hidden"
+              className="-ml-2 p-2 lg:hidden"
               onClick={() => setOpen(true)}
             >
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
@@ -146,7 +149,7 @@ export function Header() {
       </header>
 
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button
             type="button"
             aria-label="Fermer le menu"
