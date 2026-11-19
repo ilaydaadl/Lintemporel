@@ -8,8 +8,7 @@ export const SITE = {
     "L'Intemporel : des pièces essentielles, pensées pour vos looks du quotidien.",
   instagram: "lintemporelfrs",
   instagramUrl: "https://www.instagram.com/lintemporelfrs",
-  // À remplacer par votre vraie adresse :
-  email: "contact@lintemporel.fr",
+  email: "lintemporelf@gmail.com",
 };
 
 /** Catégories de la boutique : ajoutez, retirez ou réordonnez librement.
@@ -69,7 +68,7 @@ export type ShippingMethod = "relay" | "home";
 
 export const SHIPPING = {
   /** Livraison offerte en point relais à partir de ce montant, en centimes. */
-  freeFromCents: 4500,
+  freeFromCents: 4000,
   methods: {
     relay: {
       label: "Point relais Mondial Relay",
