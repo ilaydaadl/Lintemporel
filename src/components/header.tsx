@@ -87,8 +87,12 @@ export function Header() {
   return (
     <>
       <p className="eyebrow bg-ink px-4 py-2 text-center text-[0.6rem] text-cream sm:text-[0.65rem]">
-        Livraison offerte <span className="hidden sm:inline">en point relais </span>
-        dès {SHIPPING.freeFromCents / 100} €
+        <span className="sm:hidden">
+          Point relais offert dès {SHIPPING.freeFromCents / 100} €
+        </span>
+        <span className="hidden sm:inline">
+          Livraison offerte en point relais dès {SHIPPING.freeFromCents / 100} €
+        </span>
         <span className="hidden md:inline">
           <span className="mx-2 opacity-50">·</span>
           Paiement sécurisé
