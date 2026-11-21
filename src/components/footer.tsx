@@ -1,70 +1,114 @@
 import Link from "next/link";
-import { CATEGORIES, SITE } from "@/lib/config";
+import { SITE } from "@/lib/config";
 import { InstagramIcon } from "./header";
+import { NewsletterForm } from "./newsletter-form";
+
+const linkClass = "text-cream/70 transition-colors hover:text-cream";
 
 export function Footer() {
   return (
-    <footer className="mt-auto bg-sand">
-      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
-        <div>
-          <p className="font-display text-3xl">{SITE.name}</p>
-          <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
-            Des pièces essentielles, pensées pour vos looks du quotidien.
-          </p>
+    <footer className="mt-auto">
+      {/* Newsletter */}
+      <section className="bg-sand">
+        <div className="mx-auto grid max-w-7xl items-end gap-8 px-6 py-14 sm:px-8 md:grid-cols-2">
+          <div>
+            <h2 className="font-display text-4xl">Soyez la première informée</h2>
+            <p className="mt-2 text-muted">
+              Les nouvelles pièces partent vite. Recevez les arrivages avant tout
+              le monde.
+            </p>
+          </div>
+          <NewsletterForm />
         </div>
+      </section>
 
-        <div>
-          <p className="eyebrow mb-4">Boutique</p>
-          <ul className="space-y-2 text-sm">
-            <li>
-              <Link href="/nouveautes" className="hover:text-taupe-dark">
-                Nouveautés
-              </Link>
-            </li>
-            {CATEGORIES.map((c) => (
-              <li key={c.slug}>
-                <Link href={`/boutique/${c.slug}`} className="hover:text-taupe-dark">
-                  {c.label}
+      <div className="bg-ink text-cream">
+        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <p className="font-display text-3xl">{SITE.name}</p>
+            <p className="mt-3 max-w-xs text-sm text-cream/70">
+              Des pièces essentielles pour tous les jours.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-4 text-sm font-medium">Boutique</p>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/nouveautes" className={linkClass}>
+                  Nouveautés
                 </Link>
               </li>
-            ))}
-          </ul>
+              <li>
+                <Link href="/boutique/pulls" className={linkClass}>
+                  Pulls &amp; gilets
+                </Link>
+              </li>
+              <li>
+                <Link href="/boutique/robes" className={linkClass}>
+                  Robes
+                </Link>
+              </li>
+              <li>
+                <Link href="/boutique" className={linkClass}>
+                  Toute la boutique
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="mb-4 text-sm font-medium">Aide</p>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/livraison-retours" className={linkClass}>
+                  Livraison &amp; retours
+                </Link>
+              </li>
+              <li>
+                <Link href="/guide-des-tailles" className={linkClass}>
+                  Guide des tailles
+                </Link>
+              </li>
+              <li>
+                <Link href="/faq" className={linkClass}>
+                  FAQ
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className={linkClass}>
+                  Contact
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="mb-4 text-sm font-medium">Suivez-nous</p>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <a
+                  href={SITE.instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`${linkClass} inline-flex items-center gap-2`}
+                >
+                  <InstagramIcon className="h-4 w-4" />
+                  Instagram @{SITE.instagram}
+                </a>
+              </li>
+              <li className="text-cream/70">Paiement sécurisé par Stripe</li>
+            </ul>
+          </div>
         </div>
 
-        <div>
-          <p className="eyebrow mb-4">La maison</p>
-          <ul className="space-y-2 text-sm">
-            <li>
-              <Link href="/a-propos" className="hover:text-taupe-dark">
-                À propos
-              </Link>
-            </li>
-            <li>
-              <Link href="/contact" className="hover:text-taupe-dark">
-                Contact
-              </Link>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <p className="eyebrow mb-4">Suivez-nous</p>
-          <a
-            href={SITE.instagramUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-3 border border-ink/20 px-4 py-3 text-sm font-normal transition-colors hover:bg-cream"
-          >
-            <InstagramIcon />@{SITE.instagram}
-          </a>
-        </div>
-      </div>
-      <div className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-2 px-6 py-5 text-xs text-muted sm:px-8">
-          <span>
-            © {SITE.name}
-          </span>
-          <span>Paiement sécurisé par Stripe</span>
+        <div className="border-t border-cream/10">
+          <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-3 px-6 py-5 text-xs text-cream/60 sm:px-8">
+            <span>© {SITE.name}</span>
+            <Link href="/a-propos" className="hover:text-cream">
+              À propos
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

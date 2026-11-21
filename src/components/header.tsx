@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCart } from "@/lib/cart";
-import { CATEGORIES, SHIPPING, SITE } from "@/lib/config";
+import { CATEGORIES, OFFER, SHIPPING, SITE } from "@/lib/config";
 
 export function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -79,6 +79,33 @@ function ActiveDesktopNav() {
   return <DesktopNav pathname={usePathname()} />;
 }
 
+/** Bandeau défilant (statique si l'utilisateur limite les animations). */
+function AnnouncementBar() {
+  const items = [
+    "Paiement sécurisé",
+    `Livraison offerte en point relais dès ${SHIPPING.freeFromCents / 100} €`,
+    `−${OFFER.percent} % sur votre première commande`,
+  ];
+  const row = (hidden: boolean) => (
+    <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
+      {[...items, ...items].map((t, i) => (
+        <span key={i} className="flex items-center">
+          <span className="px-6">{t}</span>
+          <span className="opacity-40">·</span>
+        </span>
+      ))}
+    </div>
+  );
+  return (
+    <div className="eyebrow overflow-hidden bg-ink py-2 text-[0.62rem] text-cream sm:text-[0.65rem]">
+      <div className="marquee flex w-max">
+        {row(false)}
+        {row(true)}
+      </div>
+    </div>
+  );
+}
+
 export function Header() {
   const { count } = useCart();
   const [open, setOpen] = useState(false);
@@ -86,18 +113,7 @@ export function Header() {
 
   return (
     <>
-      <p className="eyebrow bg-ink px-4 py-2 text-center text-[0.6rem] text-cream sm:text-[0.65rem]">
-        <span className="sm:hidden">
-          Point relais offert dès {SHIPPING.freeFromCents / 100} €
-        </span>
-        <span className="hidden sm:inline">
-          Livraison offerte en point relais dès {SHIPPING.freeFromCents / 100} €
-        </span>
-        <span className="hidden md:inline">
-          <span className="mx-2 opacity-50">·</span>
-          Paiement sécurisé
-        </span>
-      </p>
+      <AnnouncementBar />
 
       <header className="sticky top-0 z-40 border-b border-line/70 bg-cream/85 backdrop-blur-md">
         <div className="mx-auto grid h-16 max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-8">

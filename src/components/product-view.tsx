@@ -7,15 +7,13 @@ import type { Product } from "@/lib/types";
 import { AddToCart } from "./add-to-cart";
 import { ProductPlaceholder } from "./knit-visual";
 
-/** Galerie + choix couleur/taille : la photo suit la couleur sélectionnée. */
+/** Galerie (miniatures + grande photo) et choix couleur/taille. */
 export function ProductView({
   product,
   header,
-  footer,
 }: {
   product: Product;
   header: React.ReactNode;
-  footer: React.ReactNode;
 }) {
   const images = product.images;
   const options = product.color_options ?? {};
@@ -29,6 +27,7 @@ export function ProductView({
       ? initialImage
       : (images[0] ?? null),
   );
+  const lowStock = product.stock > 0 && product.stock <= 3;
 
   function onColorChange(color: string) {
     const image = options[color]?.image;
@@ -36,9 +35,27 @@ export function ProductView({
   }
 
   return (
-    <div className="mt-6 grid gap-10 md:grid-cols-2">
-      <div>
-        <div className="aspect-[3/4] overflow-hidden bg-sand">
+    <div className="mt-6 grid gap-10 lg:grid-cols-[1.25fr_1fr] lg:gap-14">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row">
+        {images.length > 1 && (
+          <div className="no-scrollbar flex gap-2 overflow-x-auto sm:w-20 sm:shrink-0 sm:flex-col sm:overflow-visible">
+            {images.map((src, i) => (
+              <button
+                key={src}
+                type="button"
+                aria-label={`Photo ${i + 1}`}
+                aria-pressed={current === src}
+                onClick={() => setCurrent(src)}
+                className={`aspect-[3/4] w-16 shrink-0 overflow-hidden bg-sand ring-1 transition sm:w-full ${
+                  current === src ? "ring-ink" : "ring-transparent opacity-70 hover:opacity-100"
+                }`}
+              >
+                <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="relative aspect-[3/4] flex-1 overflow-hidden bg-sand">
           {current ? (
             <img
               key={current}
@@ -49,28 +66,15 @@ export function ProductView({
           ) : (
             <ProductPlaceholder name={product.name} />
           )}
+          {lowStock && (
+            <span className="absolute left-3 top-3 bg-cream/95 px-2.5 py-1 text-xs font-normal">
+              Plus que {product.stock} en stock
+            </span>
+          )}
         </div>
-        {images.length > 1 && (
-          <div className="mt-3 grid grid-cols-5 gap-2">
-            {images.map((src, i) => (
-              <button
-                key={src}
-                type="button"
-                aria-label={`Photo ${i + 1}`}
-                aria-pressed={current === src}
-                onClick={() => setCurrent(src)}
-                className={`aspect-[3/4] overflow-hidden bg-sand ring-1 transition ${
-                  current === src ? "ring-ink" : "ring-transparent opacity-70 hover:opacity-100"
-                }`}
-              >
-                <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className="md:sticky md:top-24 md:self-start">
+      <div className="lg:sticky lg:top-24 lg:self-start">
         {header}
         <AddToCart
           product={{
@@ -87,7 +91,6 @@ export function ProductView({
           initialColor={initialColor}
           onColorChange={onColorChange}
         />
-        {footer}
       </div>
     </div>
   );

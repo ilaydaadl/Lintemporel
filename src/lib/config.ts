@@ -121,6 +121,35 @@ export function trackingUrl(method: string | null, tracking: string) {
     : "https://www.mondialrelay.fr/suivi-de-colis/";
 }
 
+/** Offre de bienvenue. Le code doit exister dans Stripe
+ *  (Catalogue de produits > Coupons > créer un coupon de 10 %, puis un code
+ *  promo « BIENVENUE10 » limité aux premières commandes). */
+export const OFFER = {
+  percent: 10,
+  code: "BIENVENUE10",
+};
+
+/** Délai pour changer d'avis, en jours. */
+export const RETURNS_DAYS = 14;
+
+/** Informations taille affichées sur les fiches. */
+export const FIT = {
+  /** Tailles couvertes par une « Taille unique ». */
+  oneSizeRange: "34 au 40",
+  oneSizeShort: "34–40",
+  modelHeight: "1m68",
+  modelSize: "S",
+};
+
+/** « Pulls · Taille unique (34–40) » ou « Pulls · S · M · L ». */
+export function sizeSummary(sizes: string[]) {
+  if (sizes.length === 0) return "";
+  if (sizes.length === 1 && /unique/i.test(sizes[0])) {
+    return `Taille unique (${FIT.oneSizeShort})`;
+  }
+  return sizes.join(" · ");
+}
+
 /** Photo de la bannière d'accueil. Déposez un fichier dans /public (ex. "/hero.jpg")
  *  et indiquez son chemin ici ; laissé vide, une illustration est affichée. */
 export const HERO_IMAGE = "";

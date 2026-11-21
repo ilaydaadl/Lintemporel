@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { cart } from "@/lib/cart";
-import { colorHex } from "@/lib/config";
+import { cart, useCart } from "@/lib/cart";
+import {
+  colorHex,
+  FIT,
+  formatPrice,
+  RETURNS_DAYS,
+  SHIPPING,
+} from "@/lib/config";
 import type { ColorOptions } from "@/lib/types";
 
 type Props = {
@@ -22,8 +28,37 @@ type Props = {
   onColorChange?: (color: string) => void;
 };
 
+/** Barre « Plus que X € pour la livraison offerte ». */
+export function FreeShippingProgress({
+  subtotalCents,
+  className = "",
+}: {
+  subtotalCents: number;
+  className?: string;
+}) {
+  const goal = SHIPPING.freeFromCents;
+  const remaining = goal - subtotalCents;
+  const ratio = Math.min(1, Math.max(0, subtotalCents / goal));
+  return (
+    <div className={className}>
+      <div className="h-[3px] w-full overflow-hidden bg-line">
+        <div
+          className="h-full bg-ink transition-[width] duration-500"
+          style={{ width: `${ratio * 100}%` }}
+        />
+      </div>
+      <p className="mt-2 text-right text-xs text-muted">
+        {remaining > 0
+          ? `Plus que ${formatPrice(remaining)} pour la livraison offerte en point relais`
+          : "Livraison offerte en point relais ✓"}
+      </p>
+    </div>
+  );
+}
+
 export function AddToCart({ product, initialColor, onColorChange }: Props) {
   const options = product.colorOptions ?? {};
+  const { subtotalCents } = useCart();
   const [color, setColor] = useState<string | null>(
     initialColor ?? (product.colors.length === 1 ? product.colors[0] : null),
   );
@@ -33,6 +68,9 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
   const [added, setAdded] = useState(false);
   const [missing, setMissing] = useState<string | null>(null);
   const soldOut = product.stock <= 0;
+  const oneSize =
+    product.sizes.length === 1 && /unique/i.test(product.sizes[0] ?? "");
+  const modelNote = `La mannequin mesure ${FIT.modelHeight} et porte du ${FIT.modelSize}.`;
 
   function add() {
     if (product.colors.length > 0 && !color) {
@@ -57,18 +95,13 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
   }
 
   return (
-    <div className="mt-8 space-y-6">
+    <div className="mt-7 space-y-6">
       {product.colors.length > 0 && (
         <fieldset>
-          <legend className="eyebrow mb-3">
-            Couleur
-            {color && (
-              <span className="ml-2 normal-case tracking-normal text-muted">
-                {color}
-              </span>
-            )}
+          <legend className="mb-3 text-sm">
+            Couleur : <span className="text-muted">{color ?? "à choisir"}</span>
           </legend>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-2">
             {product.colors.map((c) => (
               <button
                 key={c}
@@ -82,14 +115,12 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
                   setMissing(null);
                   setAdded(false);
                 }}
-                className={`rounded-full p-0.5 ring-1 transition ${
-                  color === c
-                    ? "ring-ink"
-                    : "ring-transparent hover:ring-taupe"
+                className={`rounded-full p-[3px] ring-1 transition ${
+                  color === c ? "ring-ink" : "ring-transparent hover:ring-taupe"
                 }`}
               >
                 <span
-                  className="block h-8 w-8 rounded-full ring-1 ring-ink/15"
+                  className="block h-9 w-9 rounded-full ring-1 ring-ink/15"
                   style={{ backgroundColor: colorHex(c, options) }}
                 />
               </button>
@@ -100,43 +131,119 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
 
       {product.sizes.length > 0 && (
         <fieldset>
-          <legend className="eyebrow mb-3">Taille</legend>
-          <div className="flex flex-wrap gap-2">
-            {product.sizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setSize(s);
-                  setMissing(null);
-                  setAdded(false);
-                }}
-                aria-pressed={size === s}
-                className={`min-w-11 border px-3 py-2 text-sm font-normal transition-colors ${
-                  size === s
-                    ? "border-ink bg-ink text-cream"
-                    : "border-line bg-white hover:border-taupe"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="mb-3 flex items-baseline justify-between">
+            <legend className="text-sm">Taille</legend>
+            <Link href="/guide-des-tailles" className="text-sm underline underline-offset-4">
+              Guide des tailles
+            </Link>
           </div>
+          {oneSize ? (
+            <div className="flex items-center gap-4 bg-sand p-3">
+              <span className="shrink-0 bg-ink px-3 py-2 text-xs text-cream">
+                {product.sizes[0]}
+              </span>
+              <p className="text-sm leading-snug">
+                Convient du {FIT.oneSizeRange}. {modelNote}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setSize(s);
+                      setMissing(null);
+                      setAdded(false);
+                    }}
+                    aria-pressed={size === s}
+                    className={`min-w-11 border px-3 py-2 text-sm font-normal transition-colors ${
+                      size === s
+                        ? "border-ink bg-ink text-cream"
+                        : "border-line bg-white hover:border-taupe"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-sm text-muted">{modelNote}</p>
+            </>
+          )}
         </fieldset>
       )}
 
       {missing && <p className="text-sm text-red-800">{missing}</p>}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn" onClick={add} disabled={soldOut}>
-          {soldOut ? "Épuisé" : "Ajouter au panier"}
+      <div>
+        <button
+          type="button"
+          className="btn btn-dark w-full py-4"
+          onClick={add}
+          disabled={soldOut}
+        >
+          {soldOut
+            ? "Épuisé"
+            : `Ajouter au panier · ${formatPrice(product.priceCents)}`}
         </button>
         {added && (
-          <Link href="/panier" className="text-sm underline underline-offset-4">
-            Ajouté ✓ — voir le panier
-          </Link>
+          <p className="mt-2 text-center text-sm">
+            Ajouté ✓ —{" "}
+            <Link href="/panier" className="underline underline-offset-4">
+              voir le panier
+            </Link>
+          </p>
         )}
+        <FreeShippingProgress subtotalCents={subtotalCents} className="mt-3" />
       </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="border border-line bg-white/60 p-3">
+          <p className="font-normal">Point relais</p>
+          <p className="text-muted">
+            {formatPrice(SHIPPING.methods.relay.cents)} · offert dès{" "}
+            {SHIPPING.freeFromCents / 100} €
+          </p>
+        </div>
+        <div className="border border-line bg-white/60 p-3">
+          <p className="font-normal">Domicile</p>
+          <p className="text-muted">{formatPrice(SHIPPING.methods.home.cents)}</p>
+        </div>
+      </div>
+
+      <p className="flex items-center gap-2 text-xs text-muted">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+          <path d="M6 10V8a6 6 0 0 1 12 0v2M5 10h14v10H5z" />
+        </svg>
+        Paiement sécurisé par carte (Stripe)
+      </p>
+
+      <details className="group border-y border-line">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-normal">
+          Livraison &amp; retours
+          <span className="text-lg leading-none transition-transform group-open:rotate-45">+</span>
+        </summary>
+        <div className="space-y-2 pb-4 text-sm leading-relaxed text-muted">
+          <p>
+            <span className="text-ink">Point relais Mondial Relay</span> :{" "}
+            {formatPrice(SHIPPING.methods.relay.cents)}, offert dès{" "}
+            {SHIPPING.freeFromCents / 100} € d&apos;achat ({SHIPPING.methods.relay.delay}).
+          </p>
+          <p>
+            <span className="text-ink">À domicile (Colissimo)</span> :{" "}
+            {formatPrice(SHIPPING.methods.home.cents)} ({SHIPPING.methods.home.delay}).
+          </p>
+          <p>
+            <span className="text-ink">Retours</span> : vous avez {RETURNS_DAYS} jours
+            après réception pour changer d&apos;avis, sans justification.{" "}
+            <Link href="/livraison-retours" className="underline underline-offset-4">
+              En savoir plus
+            </Link>
+          </p>
+        </div>
+      </details>
     </div>
   );
 }

@@ -180,6 +180,8 @@ export async function POST(req: Request) {
         }),
     phone_number_collection: { enabled: true },
     billing_address_collection: "required",
+    // Champ « code promo » sur la page Stripe (ex. code de bienvenue -10 %)
+    allow_promotion_codes: true,
     shipping_options: [
       {
         shipping_rate_data: {

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { ProductGrid } from "@/components/product-card";
 import { ProductView } from "@/components/product-view";
-import { categoryByLabel, formatPrice, SHIPPING } from "@/lib/config";
-import { getProductBySlug } from "@/lib/products";
+import { categoryByLabel, formatPrice } from "@/lib/config";
+import { getProductBySlug, getProducts } from "@/lib/products";
 
 export async function generateMetadata({
   params,
@@ -17,7 +18,7 @@ export async function generateMetadata({
 
 export default function ProductPage({ params }: PageProps<"/produit/[slug]">) {
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-8">
       <Suspense
         fallback={<div className="aspect-[4/5] max-w-md animate-pulse bg-sand" />}
       >
@@ -37,6 +38,12 @@ async function ProductDetails({
   if (!product) notFound();
 
   const category = categoryByLabel(product.category);
+  // « Complétez le look » : d'autres pièces, en privilégiant une autre catégorie
+  const others = (await getProducts()).filter((p) => p.id !== product.id);
+  const related = [
+    ...others.filter((p) => p.category !== product.category),
+    ...others.filter((p) => p.category === product.category),
+  ].slice(0, 4);
 
   return (
     <>
@@ -62,26 +69,25 @@ async function ProductDetails({
             {product.category && (
               <p className="eyebrow text-muted">{product.category}</p>
             )}
-            <h1 className="font-display mt-2 text-4xl">{product.name}</h1>
+            <h1 className="font-display mt-2 text-4xl sm:text-5xl">{product.name}</h1>
             <p className="mt-3 text-xl font-normal">
               {formatPrice(product.price_cents)}
             </p>
-            <p className="mt-6 whitespace-pre-line leading-relaxed">
-              {product.description}
-            </p>
+            {product.description && (
+              <p className="mt-5 whitespace-pre-line leading-relaxed text-muted">
+                {product.description}
+              </p>
+            )}
           </>
         }
-        footer={
-          <ul className="mt-8 space-y-1 border-t border-line pt-5 text-sm text-muted">
-            <li>
-              Point relais {formatPrice(SHIPPING.methods.relay.cents)} (offert
-              dès {formatPrice(SHIPPING.freeFromCents)}) · Domicile{" "}
-              {formatPrice(SHIPPING.methods.home.cents)}
-            </li>
-            <li>Paiement sécurisé par carte (Stripe)</li>
-          </ul>
-        }
       />
+
+      {related.length > 0 && (
+        <section className="mt-20">
+          <h2 className="font-display mb-7 text-4xl">Complétez le look</h2>
+          <ProductGrid products={related} />
+        </section>
+      )}
     </>
   );
 }

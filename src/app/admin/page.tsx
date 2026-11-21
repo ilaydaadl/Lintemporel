@@ -146,11 +146,11 @@ function Dashboard({
   supabase: SupabaseClient;
   token: string;
 }) {
-  const [tab, setTab] = useState<"articles" | "commandes">("articles");
+  const [tab, setTab] = useState<"articles" | "commandes" | "newsletter">("articles");
   return (
     <>
       <div className="mb-6 flex gap-6 text-sm font-normal">
-        {(["articles", "commandes"] as const).map((t) => (
+        {(["articles", "commandes", "newsletter"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -165,8 +165,10 @@ function Dashboard({
       </div>
       {tab === "articles" ? (
         <Products supabase={supabase} token={token} />
-      ) : (
+      ) : tab === "commandes" ? (
         <Orders supabase={supabase} />
+      ) : (
+        <Newsletter supabase={supabase} />
       )}
     </>
   );
@@ -980,5 +982,64 @@ function Orders({ supabase }: { supabase: SupabaseClient }) {
         />
       ))}
     </ul>
+  );
+}
+
+/* ------------------------------ Newsletter ------------------------------ */
+
+function Newsletter({ supabase }: { supabase: SupabaseClient }) {
+  const [rows, setRows] = useState<{ email: string; created_at: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from("newsletter_subscribers")
+      .select("email, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setError(error.message);
+        else setRows(data ?? []);
+      });
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
+  if (error) return <p className="text-sm text-red-800">{error}</p>;
+  if (!rows) return <p className="text-muted">Chargement…</p>;
+  if (rows.length === 0)
+    return <p className="text-muted">Aucune inscription pour l&apos;instant.</p>;
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <p className="text-sm">
+          {rows.length} inscrite{rows.length > 1 ? "s" : ""}
+        </p>
+        <button
+          type="button"
+          className="btn btn-outline px-4 py-2"
+          onClick={async () => {
+            await navigator.clipboard.writeText(rows.map((r) => r.email).join(", "));
+            setCopied(true);
+          }}
+        >
+          {copied ? "Adresses copiées ✓" : "Copier toutes les adresses"}
+        </button>
+      </div>
+      <ul className="divide-y divide-line border-y border-line text-sm">
+        {rows.map((r) => (
+          <li key={r.email} className="flex justify-between gap-4 py-2">
+            <span>{r.email}</span>
+            <span className="text-muted">
+              {new Date(r.created_at).toLocaleDateString("fr-FR", { dateStyle: "medium" })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
