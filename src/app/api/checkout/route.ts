@@ -6,7 +6,7 @@ import {
   type ShippingMethod,
 } from "@/lib/config";
 import { getProductsByIdsFresh } from "@/lib/products";
-import { getStripe } from "@/lib/server-clients";
+import { getServiceSupabase, getStripe } from "@/lib/server-clients";
 import type { Relay } from "@/lib/types";
 
 type Line = {
@@ -69,6 +69,23 @@ function parseShipping(
   return { method, relay: relay as Relay };
 }
 
+/** Cette adresse a-t-elle déjà une commande payée (hors remboursement) ? */
+async function hasPreviousOrder(email: string) {
+  const supabase = getServiceSupabase();
+  if (!supabase) return false;
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id")
+    .eq("email", email)
+    .neq("status", "remboursée")
+    .limit(1);
+  if (error) {
+    console.error("Vérification de première commande impossible :", error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 const fail = (error: string, status = 400) =>
   NextResponse.json({ error }, { status });
 
@@ -90,6 +107,16 @@ export async function POST(req: Request) {
   }
   const { method, relay } = shipping;
   const methodInfo = SHIPPING.methods[method];
+
+  // E-mail saisi dans le panier : il est verrouillé sur la page Stripe, ce qui
+  // permet de réserver le code de bienvenue aux clientes sans commande passée.
+  const rawEmail = (body as { email?: unknown })?.email;
+  const email =
+    typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+    return fail("Indiquez une adresse e-mail valide.");
+  }
+  const alreadyOrdered = await hasPreviousOrder(email);
 
   // Les prix et le stock viennent TOUJOURS de la base, jamais du navigateur.
   const products = await getProductsByIdsFresh([
@@ -181,7 +208,9 @@ export async function POST(req: Request) {
     phone_number_collection: { enabled: true },
     billing_address_collection: "required",
     // Champ « code promo » sur la page Stripe (ex. code de bienvenue -10 %)
-    allow_promotion_codes: true,
+    customer_email: email,
+    // Champ « code promo » seulement pour une première commande
+    allow_promotion_codes: !alreadyOrdered,
     shipping_options: [
       {
         shipping_rate_data: {

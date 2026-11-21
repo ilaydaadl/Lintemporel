@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     .upsert(
       {
         stripe_session_id: session.id,
-        email: session.customer_details?.email ?? null,
+        email: session.customer_details?.email?.trim().toLowerCase() ?? null,
         customer_name:
           recipient || shipping?.name || session.customer_details?.name || null,
         shipping_method: method,

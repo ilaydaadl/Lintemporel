@@ -37,6 +37,7 @@ export function CartView({ products }: { products: Product[] }) {
   const [error, setError] = useState<string | null>(null);
   const [method, setMethod] = useState<ShippingMethod>("relay");
   const [relay, setRelay] = useState<Relay | null>(null);
+  const [email, setEmail] = useState("");
 
   const shippingCents = computeShipping(method, subtotalCents);
   const remaining = SHIPPING.freeFromCents - subtotalCents;
@@ -50,6 +51,10 @@ export function CartView({ products }: { products: Product[] }) {
   const needsRelay = method === "relay" && !relay;
 
   async function checkout() {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      setError("Indiquez votre adresse e-mail.");
+      return;
+    }
     if (needsRelay) {
       setError("Choisissez votre point relais sur la carte.");
       return;
@@ -68,6 +73,7 @@ export function CartView({ products }: { products: Product[] }) {
             quantity: i.quantity,
           })),
           shipping: { method, relay: method === "relay" ? relay : null },
+          email: email.trim(),
         }),
       });
       const data = await res.json();
@@ -352,10 +358,29 @@ export function CartView({ products }: { products: Product[] }) {
             </div>
           </dl>
 
-          <p className="ml-auto mt-4 max-w-xs text-right text-xs text-muted">
-            Code <span className="font-medium text-ink">{OFFER.code}</span> : −{OFFER.percent} %
-            sur votre première commande, à saisir sur la page de paiement.
-          </p>
+          <div className="ml-auto mt-6 max-w-sm">
+            <label htmlFor="cart-email" className="text-sm">
+              Votre adresse e-mail
+            </label>
+            <input
+              id="cart-email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              placeholder="vous@exemple.fr"
+              className="field mt-1"
+            />
+            <p className="mt-2 text-xs text-muted">
+              Pour votre confirmation de commande et le suivi du colis. Première
+              commande ? Code <span className="font-medium text-ink">{OFFER.code}</span> :
+              −{OFFER.percent} %, à saisir sur la page de paiement.
+            </p>
+          </div>
 
           <div className="mt-6 text-right">
             <button
