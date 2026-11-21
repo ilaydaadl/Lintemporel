@@ -6,7 +6,6 @@ import {
   type ShippingMethod,
 } from "@/lib/config";
 import { getProductsByIdsFresh } from "@/lib/products";
-import { checkPromo, isValidEmail } from "@/lib/promo";
 import { getStripe } from "@/lib/server-clients";
 import type { Relay } from "@/lib/types";
 
@@ -92,17 +91,6 @@ export async function POST(req: Request) {
   const { method, relay } = shipping;
   const methodInfo = SHIPPING.methods[method];
 
-  // E-mail saisi dans le panier : il est verrouillé sur la page Stripe, ce qui
-  // permet de réserver le code de bienvenue aux clientes sans commande passée.
-  const rawEmail = (body as { email?: unknown })?.email;
-  const email =
-    typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
-  if (!isValidEmail(email)) {
-    return fail("Indiquez une adresse e-mail valide.");
-  }
-  const rawPromo = (body as { promoCode?: unknown })?.promoCode;
-  const promoCode = typeof rawPromo === "string" ? rawPromo.trim() : "";
-
   // Les prix et le stock viennent TOUJOURS de la base, jamais du navigateur.
   const products = await getProductsByIdsFresh([
     ...new Set(lines.map((l) => l.id)),
@@ -140,13 +128,6 @@ export async function POST(req: Request) {
     ? `${relay.name}, ${relay.address}, ${relay.postcode} ${relay.city}`
     : "";
   const origin = new URL(req.url).origin;
-
-  let promo: { promotionCodeId: string } | null = null;
-  if (promoCode) {
-    const result = await checkPromo(stripe, promoCode, email, subtotal);
-    if (!result.ok) return fail(result.error);
-    promo = result;
-  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -200,9 +181,7 @@ export async function POST(req: Request) {
     phone_number_collection: { enabled: true },
     billing_address_collection: "required",
     // Champ « code promo » sur la page Stripe (ex. code de bienvenue -10 %)
-    customer_email: email,
-    // Code promo validé dans le panier (revérifié ci-dessus)
-    ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
+    allow_promotion_codes: true,
     shipping_options: [
       {
         shipping_rate_data: {
