@@ -6,7 +6,8 @@ import {
   type ShippingMethod,
 } from "@/lib/config";
 import { getProductsByIdsFresh } from "@/lib/products";
-import { getServiceSupabase, getStripe } from "@/lib/server-clients";
+import { checkPromo, isValidEmail } from "@/lib/promo";
+import { getStripe } from "@/lib/server-clients";
 import type { Relay } from "@/lib/types";
 
 type Line = {
@@ -69,23 +70,6 @@ function parseShipping(
   return { method, relay: relay as Relay };
 }
 
-/** Cette adresse a-t-elle déjà une commande payée (hors remboursement) ? */
-async function hasPreviousOrder(email: string) {
-  const supabase = getServiceSupabase();
-  if (!supabase) return false;
-  const { data, error } = await supabase
-    .from("orders")
-    .select("id")
-    .eq("email", email)
-    .neq("status", "remboursée")
-    .limit(1);
-  if (error) {
-    console.error("Vérification de première commande impossible :", error.message);
-    return false;
-  }
-  return (data?.length ?? 0) > 0;
-}
-
 const fail = (error: string, status = 400) =>
   NextResponse.json({ error }, { status });
 
@@ -113,10 +97,11 @@ export async function POST(req: Request) {
   const rawEmail = (body as { email?: unknown })?.email;
   const email =
     typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+  if (!isValidEmail(email)) {
     return fail("Indiquez une adresse e-mail valide.");
   }
-  const alreadyOrdered = await hasPreviousOrder(email);
+  const rawPromo = (body as { promoCode?: unknown })?.promoCode;
+  const promoCode = typeof rawPromo === "string" ? rawPromo.trim() : "";
 
   // Les prix et le stock viennent TOUJOURS de la base, jamais du navigateur.
   const products = await getProductsByIdsFresh([
@@ -155,6 +140,13 @@ export async function POST(req: Request) {
     ? `${relay.name}, ${relay.address}, ${relay.postcode} ${relay.city}`
     : "";
   const origin = new URL(req.url).origin;
+
+  let promo: { promotionCodeId: string } | null = null;
+  if (promoCode) {
+    const result = await checkPromo(stripe, promoCode, email, subtotal);
+    if (!result.ok) return fail(result.error);
+    promo = result;
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -209,8 +201,8 @@ export async function POST(req: Request) {
     billing_address_collection: "required",
     // Champ « code promo » sur la page Stripe (ex. code de bienvenue -10 %)
     customer_email: email,
-    // Champ « code promo » seulement pour une première commande
-    allow_promotion_codes: !alreadyOrdered,
+    // Code promo validé dans le panier (revérifié ci-dessus)
+    ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
     shipping_options: [
       {
         shipping_rate_data: {
