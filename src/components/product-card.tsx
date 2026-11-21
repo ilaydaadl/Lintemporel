@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { colorHex, formatPrice, sizeSummary } from "@/lib/config";
 import type { Product } from "@/lib/types";
+import { FavoriteButton } from "./favorite-button";
 import { ProductPlaceholder } from "./knit-visual";
 
 const MAX_SWATCHES = 6;
@@ -38,7 +39,12 @@ export function ProductCard({ product }: { product: Product }) {
     .join(" · ");
 
   return (
-    <div className="group">
+    <div className="group relative">
+      <FavoriteButton
+        productId={product.id}
+        productName={product.name}
+        className="absolute right-3 top-3 z-10"
+      />
       <Link href={href} className="block">
         <div className="relative aspect-[3/4] overflow-hidden bg-sand">
           <div className="h-full w-full transition-transform duration-700 ease-out group-hover:scale-[1.04]">

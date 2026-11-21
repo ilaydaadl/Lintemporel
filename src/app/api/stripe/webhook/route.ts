@@ -81,6 +81,7 @@ export async function POST(req: Request) {
         customer_name:
           recipient || shipping?.name || session.customer_details?.name || null,
         shipping_method: method,
+        user_id: /^[0-9a-f-]{36}$/i.test(meta.user_id ?? "") ? meta.user_id : null,
         relay,
         phone: session.customer_details?.phone ?? null,
         billing_address: session.customer_details?.address ?? null,

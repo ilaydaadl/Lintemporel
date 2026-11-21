@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ColorSwatch } from "@/components/color-swatch";
 import { ProductPlaceholder } from "@/components/knit-visual";
 import { cart, useCart } from "@/lib/cart";
+import { useSession } from "@/lib/session";
 import { RelayPicker } from "@/components/relay-picker";
 import {
   formatPrice,
@@ -33,6 +34,7 @@ function pickSuggestion(products: Product[], inCart: Set<string>, remaining: num
 
 export function CartView({ products }: { products: Product[] }) {
   const { items, subtotalCents, count } = useCart();
+  const { session } = useSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [method, setMethod] = useState<ShippingMethod>("relay");
@@ -59,7 +61,11 @@ export function CartView({ products }: { products: Product[] }) {
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Connectée : la commande est rattachée à son compte
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           items: items.map((i) => ({
             id: i.id,
@@ -92,6 +98,29 @@ export function CartView({ products }: { products: Product[] }) {
           Continuer mes achats
         </Link>
       </div>
+
+      {items.length > 0 && (
+        <p className="mb-6 text-sm text-muted">
+          {session ? (
+            <>
+              Connectée : <span className="text-ink">{session.user.email}</span> — votre
+              commande sera enregistrée dans{" "}
+              <Link href="/compte" className="underline underline-offset-4">
+                votre compte
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Vous avez un compte ?{" "}
+              <Link href="/compte?suivant=/panier" className="text-ink underline underline-offset-4">
+                Se connecter
+              </Link>{" "}
+              pour retrouver votre commande et payer plus vite.
+            </>
+          )}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <div className="py-10 text-center">

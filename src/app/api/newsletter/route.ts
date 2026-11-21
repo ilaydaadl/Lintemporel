@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase, getStripe } from "@/lib/server-clients";
+import { addToBrevoList, sendWelcomeEmail } from "@/lib/brevo";
 import { createWelcomeCode } from "@/lib/welcome";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -64,6 +65,13 @@ export async function POST(req: Request) {
     console.error("Inscription newsletter impossible :", error.message);
     return reply({ ok: false, error: "L'inscription n'a pas fonctionné, réessayez." }, 500);
   }
+
+  // Brevo : ajout à la liste + e-mail de bienvenue (une panne ne bloque pas l'inscription)
+  const siteUrl = new URL(req.url).origin;
+  await Promise.allSettled([
+    addToBrevoList(email).catch((e) => console.error(e)),
+    sendWelcomeEmail(email, code, siteUrl).catch((e) => console.error(e)),
+  ]);
 
   return reply({ ok: true, code, alreadyCustomer });
 }

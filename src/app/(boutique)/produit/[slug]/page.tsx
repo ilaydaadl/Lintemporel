@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { FavoriteButton } from "@/components/favorite-button";
 import { ProductGrid } from "@/components/product-card";
 import { ProductView } from "@/components/product-view";
 import { categoryByLabel, formatPrice } from "@/lib/config";
@@ -69,7 +70,14 @@ async function ProductDetails({
             {product.category && (
               <p className="eyebrow text-muted">{product.category}</p>
             )}
-            <h1 className="font-display mt-2 text-4xl sm:text-5xl">{product.name}</h1>
+            <div className="mt-2 flex items-start justify-between gap-4">
+              <h1 className="font-display text-4xl sm:text-5xl">{product.name}</h1>
+              <FavoriteButton
+                productId={product.id}
+                productName={product.name}
+                className="mt-1 shrink-0 border border-line"
+              />
+            </div>
             <p className="mt-3 text-xl font-normal">
               {formatPrice(product.price_cents)}
             </p>

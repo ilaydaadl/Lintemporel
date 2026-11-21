@@ -6,7 +6,7 @@ import {
   type ShippingMethod,
 } from "@/lib/config";
 import { getProductsByIdsFresh } from "@/lib/products";
-import { getStripe } from "@/lib/server-clients";
+import { getServiceSupabase, getStripe } from "@/lib/server-clients";
 import type { Relay } from "@/lib/types";
 
 type Line = {
@@ -129,6 +129,14 @@ export async function POST(req: Request) {
     : "";
   const origin = new URL(req.url).origin;
 
+  // Cliente connectée : e-mail du compte verrouillé et commande rattachée
+  let account: { id: string; email: string } | null = null;
+  const token = req.headers.get("authorization")?.replace(/^Bearer /, "");
+  if (token) {
+    const { data } = (await getServiceSupabase()?.auth.getUser(token)) ?? { data: null };
+    if (data?.user?.email) account = { id: data.user.id, email: data.user.email };
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     locale: "fr",
@@ -194,7 +202,9 @@ export async function POST(req: Request) {
         },
       },
     ],
+    ...(account ? { customer_email: account.email } : {}),
     metadata: {
+      ...(account ? { user_id: account.id } : {}),
       shipping_method: method,
       ...(relay
         ? {

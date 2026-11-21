@@ -150,6 +150,16 @@ export function Header() {
               <InstagramIcon />
             </a>
             <Link
+              href="/compte"
+              aria-label="Mon compte"
+              className="transition-colors hover:text-taupe-dark"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6" aria-hidden>
+                <circle cx="12" cy="8.5" r="3.75" />
+                <path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" />
+              </svg>
+            </Link>
+            <Link
               href="/panier"
               aria-label={`Panier (${count} article${count > 1 ? "s" : ""})`}
               className="relative transition-colors hover:text-taupe-dark"
@@ -198,6 +208,9 @@ export function Header() {
               </Link>
             ))}
             <div className="mt-6 flex flex-col border-t border-line pt-4">
+              <Link href="/compte" onClick={close} className="py-2.5">
+                Mon compte
+              </Link>
               <Link href="/a-propos" onClick={close} className="py-2.5">
                 À propos
               </Link>
