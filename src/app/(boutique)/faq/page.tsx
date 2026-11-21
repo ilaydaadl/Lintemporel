@@ -36,7 +36,7 @@ const QUESTIONS = [
   },
   {
     q: "Y a-t-il une offre pour la première commande ?",
-    a: `Oui : −${OFFER.percent} % avec le code ${OFFER.code}, à saisir sur la page de paiement.`,
+    a: `Oui : inscrivez-vous à la newsletter (en bas de page) et recevez un code personnel de −${OFFER.percent} %, valable une fois, à saisir sur la page de paiement.`,
   },
   {
     q: "Les articles seront-ils réassortis ?",

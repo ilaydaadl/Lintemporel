@@ -353,8 +353,12 @@ export function CartView({ products }: { products: Product[] }) {
           </dl>
 
           <p className="ml-auto mt-4 max-w-xs text-right text-xs text-muted">
-            Code <span className="font-medium text-ink">{OFFER.code}</span> : −{OFFER.percent} %
-            sur votre première commande, à saisir sur la page de paiement.
+            Code de bienvenue ou code promo : à saisir sur la page de paiement.
+            Pas encore de code ?{" "}
+            <a href="#newsletter" className="underline underline-offset-4 hover:text-ink">
+              −{OFFER.percent} % en vous inscrivant
+            </a>
+            .
           </p>
 
           <div className="mt-6 text-right">

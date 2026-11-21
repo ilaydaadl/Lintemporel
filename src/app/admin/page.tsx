@@ -988,7 +988,9 @@ function Orders({ supabase }: { supabase: SupabaseClient }) {
 /* ------------------------------ Newsletter ------------------------------ */
 
 function Newsletter({ supabase }: { supabase: SupabaseClient }) {
-  const [rows, setRows] = useState<{ email: string; created_at: string }[] | null>(null);
+  const [rows, setRows] = useState<
+    { email: string; created_at: string; welcome_code: string | null }[] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -996,7 +998,7 @@ function Newsletter({ supabase }: { supabase: SupabaseClient }) {
     let active = true;
     supabase
       .from("newsletter_subscribers")
-      .select("email, created_at")
+      .select("email, created_at, welcome_code")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!active) return;
@@ -1033,8 +1035,11 @@ function Newsletter({ supabase }: { supabase: SupabaseClient }) {
       <ul className="divide-y divide-line border-y border-line text-sm">
         {rows.map((r) => (
           <li key={r.email} className="flex justify-between gap-4 py-2">
-            <span>{r.email}</span>
-            <span className="text-muted">
+            <span className="min-w-0 truncate">{r.email}</span>
+            {r.welcome_code && (
+              <span className="shrink-0 text-xs tracking-wider text-muted">{r.welcome_code}</span>
+            )}
+            <span className="shrink-0 text-muted">
               {new Date(r.created_at).toLocaleDateString("fr-FR", { dateStyle: "medium" })}
             </span>
           </li>

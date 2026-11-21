@@ -121,12 +121,15 @@ export function trackingUrl(method: string | null, tracking: string) {
     : "https://www.mondialrelay.fr/suivi-de-colis/";
 }
 
-/** Offre de bienvenue. Le code doit exister dans Stripe
- *  (Catalogue de produits > Coupons > créer un coupon de 10 %, puis un code
- *  promo « BIENVENUE10 » limité aux premières commandes). */
+/** Offre de bienvenue : chaque inscrite à la newsletter reçoit un code
+ *  personnel (ex. BIENVENUE-7KQ2), valable une seule fois. Le site crée
+ *  lui-même le bon de réduction et les codes dans Stripe. */
 export const OFFER = {
   percent: 10,
-  code: "BIENVENUE10",
+  /** Début des codes personnels. */
+  codePrefix: "BIENVENUE",
+  /** Identifiant du bon de réduction Stripe utilisé pour ces codes. */
+  stripeCouponId: "LINTEMPOREL_BIENVENUE",
 };
 
 /** Délai pour changer d'avis, en jours. */

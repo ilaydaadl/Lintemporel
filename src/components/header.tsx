@@ -84,7 +84,7 @@ function AnnouncementBar() {
   const items = [
     "Paiement sécurisé",
     `Livraison offerte en point relais dès ${SHIPPING.freeFromCents / 100} €`,
-    `−${OFFER.percent} % sur votre première commande`,
+    `−${OFFER.percent} % sur votre première commande en vous inscrivant`,
   ];
   const row = (hidden: boolean) => (
     <div className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>

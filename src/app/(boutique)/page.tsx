@@ -157,18 +157,16 @@ export default async function HomePage() {
             </div>
           )}
           <PhotoTile product={heroSide} />
-          <div className="flex flex-col justify-center bg-sand p-5 sm:p-6">
+          <div className="flex flex-col items-start justify-center bg-sand p-5 sm:p-6">
             <p className="font-display text-3xl leading-tight sm:text-4xl">
               −{OFFER.percent} %
             </p>
             <p className="font-display text-xl leading-tight">
               sur votre première commande
             </p>
-            <p className="mt-3 text-xs text-muted">
-              Avec le code{" "}
-              <span className="font-medium tracking-wider text-ink">{OFFER.code}</span>
-              , à saisir au paiement.
-            </p>
+            <a href="#newsletter" className="mt-3 text-xs text-muted underline underline-offset-4 hover:text-ink">
+              Inscrivez-vous à la newsletter pour recevoir votre code
+            </a>
           </div>
         </div>
       </section>

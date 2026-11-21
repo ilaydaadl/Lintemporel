@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SITE } from "@/lib/config";
+import { OFFER, SITE } from "@/lib/config";
 import { InstagramIcon } from "./header";
 import { NewsletterForm } from "./newsletter-form";
 
@@ -9,13 +9,13 @@ export function Footer() {
   return (
     <footer className="mt-auto">
       {/* Newsletter */}
-      <section className="bg-sand">
+      <section id="newsletter" className="scroll-mt-24 bg-sand">
         <div className="mx-auto grid max-w-7xl items-end gap-8 px-6 py-14 sm:px-8 md:grid-cols-2">
           <div>
             <h2 className="font-display text-4xl">Soyez la première informée</h2>
             <p className="mt-2 text-muted">
               Les nouvelles pièces partent vite. Recevez les arrivages avant tout
-              le monde.
+              le monde, et −{OFFER.percent} % sur votre première commande.
             </p>
           </div>
           <NewsletterForm />
