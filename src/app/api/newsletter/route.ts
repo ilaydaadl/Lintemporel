@@ -36,7 +36,13 @@ export async function POST(req: Request) {
     .eq("email", email)
     .maybeSingle();
   if (existing) {
-    return reply({ ok: true, already: true, code: existing.welcome_code ?? null });
+    // On renvoie l'e-mail de bienvenue (utile si elle a perdu son code)
+    const code = existing.welcome_code ?? null;
+    await Promise.allSettled([
+      addToBrevoList(email).catch((e) => console.error(e)),
+      sendWelcomeEmail(email, code, new URL(req.url).origin).catch((e) => console.error(e)),
+    ]);
+    return reply({ ok: true, already: true, code });
   }
 
   // Le code de bienvenue est réservé aux personnes qui n'ont jamais commandé

@@ -9,7 +9,10 @@ const API = "https://api.brevo.com/v3";
 
 function config() {
   const key = process.env.BREVO_API_KEY?.trim();
-  if (!key) return null;
+  if (!key) {
+    console.warn("Brevo non configuré : variable BREVO_API_KEY absente dans Vercel.");
+    return null;
+  }
   const listId = Number(process.env.BREVO_LIST_ID);
   return {
     key,
