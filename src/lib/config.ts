@@ -136,15 +136,15 @@ export const OFFER = {
  *  À COMPLÉTER : tant qu'un champ est vide, la page affiche « à compléter » en rouge. */
 export const LEGAL = {
   /** Nom et prénom de l'entrepreneur·e (ou nom de la société). */
-  ownerName: "",
+  ownerName: "Sakina Farsi",
   /** Statut juridique. */
   status: "Entrepreneur individuel (micro-entreprise)",
   /** Adresse postale du siège (peut être une domiciliation). */
-  address: "",
-  /** Numéro SIRET (14 chiffres). */
-  siret: "",
+  address: "40 rue Camille Guillaume, 91270 Vigneux-sur-Seine, France",
+  /** Numéro SIREN (9 chiffres) — ou SIRET (14 chiffres). */
+  siren: "920 639 267",
   /** Téléphone de contact (obligatoire dans les mentions légales). */
-  phone: "",
+  phone: "+33 6 83 61 08 98",
   /** true si franchise en base de TVA (cas habituel en micro-entreprise). */
   vatExempt: true,
   /** Numéro de TVA intracommunautaire, si vatExempt est false. */

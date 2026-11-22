@@ -35,7 +35,7 @@ export default function CgvPage() {
         <p>
           <Fill value={LEGAL.ownerName} label="nom et prénom" />, {LEGAL.status}, dont
           le siège est situé <Fill value={LEGAL.address} label="adresse" />, immatriculé
-          sous le numéro SIRET <Fill value={LEGAL.siret} label="SIRET" />. Contact :{" "}
+          sous le numéro SIREN <Fill value={LEGAL.siren} label="SIREN" />. Contact :{" "}
           {contact}.
         </p>
       </Article>

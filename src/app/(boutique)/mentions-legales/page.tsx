@@ -19,7 +19,8 @@ export default function MentionsLegalesPage() {
             Adresse : <Fill value={LEGAL.address} label="adresse" />
           </li>
           <li>
-            SIRET : <Fill value={LEGAL.siret} label="SIRET" />
+            SIREN : <Fill value={LEGAL.siren} label="SIREN" /> (immatriculation au
+            Registre national des entreprises)
           </li>
           <li>
             {LEGAL.vatExempt ? (
