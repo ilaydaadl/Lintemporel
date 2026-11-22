@@ -275,7 +275,7 @@ function Dashboard({
           ) : tab === "articles" ? (
             <Products supabase={supabase} token={token} />
           ) : tab === "commandes" ? (
-            <Orders supabase={supabase} />
+            <Orders supabase={supabase} token={token} />
           ) : (
             <Newsletter supabase={supabase} />
           )}
@@ -1098,26 +1098,70 @@ function formatAddress(a: Record<string, string | null> | null) {
     .join(", ");
 }
 
+const EMAIL_LABELS = {
+  shipped: "d'expédition",
+  delivered: "de livraison",
+  refunded: "de remboursement",
+} as const;
+
+function sentOn(date: string | undefined) {
+  return date
+    ? new Date(date).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })
+    : null;
+}
+
 function OrderCard({
   order: o,
   supabase,
+  token,
   onChange,
 }: {
   order: Order;
   supabase: SupabaseClient;
+  token: string;
   onChange: () => void;
 }) {
   const [tracking, setTracking] = useState(o.tracking_number ?? "");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmRefund, setConfirmRefund] = useState(false);
+  const sent = o.notifications ?? {};
+
+  /** Change le statut et envoie l'e-mail correspondant à la cliente. */
+  async function notify(kind: "shipped" | "delivered" | "refunded") {
+    setBusy(kind);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/order-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId: o.id, kind, tracking: tracking.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Action impossible.");
+      setNotice(
+        data.emailSent
+          ? `E-mail ${EMAIL_LABELS[kind]} envoyé à ${o.email} ✓`
+          : `Statut mis à jour, mais e-mail non envoyé : ${data.emailError}`,
+      );
+      setConfirmRefund(false);
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
   const a = o.shipping_address;
   const isRelay = o.shipping_method === "relay";
 
   async function update(values: Partial<Order>) {
-    setBusy(true);
+    setBusy("status");
     setError(null);
     const { error } = await supabase.from("orders").update(values).eq("id", o.id);
-    setBusy(false);
+    setBusy(null);
     if (error) return setError(error.message);
     onChange();
   }
@@ -1176,68 +1220,101 @@ function OrderCard({
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
-        <label className="flex-1">
-          <span className="text-xs text-muted">Numéro de suivi</span>
-          <input
-            value={tracking}
-            onChange={(e) => setTracking(e.target.value)}
-            placeholder="Collez le numéro de l'étiquette"
-            className="field mt-1 py-1.5"
-          />
-        </label>
-        <button
-          type="button"
-          className="btn px-4 py-2"
-          disabled={busy || !tracking.trim()}
-          onClick={() =>
-            update({
-              tracking_number: tracking.trim(),
-              status: "expédiée",
-              shipped_at: o.shipped_at ?? new Date().toISOString(),
-            })
-          }
-        >
-          {o.tracking_number ? "Mettre à jour" : "Marquer expédiée"}
-        </button>
-      </div>
-
-      {o.tracking_number && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {o.email ? (
-            <a
-              href={shippingEmail(o, o.tracking_number)}
-              className="btn btn-outline px-4 py-2"
-            >
-              Prévenir la cliente par e-mail
-            </a>
-          ) : (
-            <span className="text-muted">Pas d&apos;e-mail pour cette commande</span>
-          )}
+      {/* Actions : chaque bouton change le statut et prévient la cliente */}
+      <div className="mt-4 space-y-3 border-t border-line pt-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-48 flex-1">
+            <span className="text-xs text-muted">Numéro de suivi</span>
+            <input
+              value={tracking}
+              onChange={(e) => setTracking(e.target.value)}
+              placeholder="Collez le numéro de l'étiquette"
+              className="field mt-1 py-2"
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-dark px-4 py-2.5"
+            disabled={!!busy || !tracking.trim()}
+            onClick={() => notify("shipped")}
+          >
+            {busy === "shipped" ? "Envoi…" : sent.shipped ? "Renvoyer l'e-mail d'expédition" : "📦 Expédiée — prévenir la cliente"}
+          </button>
+        </div>
+        {o.tracking_number && (
           <a
             href={trackingUrl(o.shipping_method, o.tracking_number)}
             target="_blank"
             rel="noreferrer"
-            className="underline underline-offset-4"
+            className="inline-block text-xs underline underline-offset-4"
           >
-            Suivre le colis
+            Suivre le colis ({o.tracking_number})
           </a>
-          {o.shipped_at && (
-            <span className="text-xs text-muted">
-              Expédiée le{" "}
-              {new Date(o.shipped_at).toLocaleDateString("fr-FR", {
-                dateStyle: "medium",
-              })}
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn btn-outline px-4 py-2"
+            disabled={!!busy}
+            onClick={() => notify("delivered")}
+          >
+            {busy === "delivered" ? "Envoi…" : sent.delivered ? "Renvoyer l'e-mail de livraison" : "✓ Livrée — prévenir la cliente"}
+          </button>
+          {confirmRefund ? (
+            <span className="flex flex-wrap items-center gap-2 bg-red-50 px-3 py-2 text-xs text-red-900">
+              Avez-vous bien remboursé dans Stripe ?
+              <button
+                type="button"
+                className="bg-red-800 px-3 py-1 text-white disabled:opacity-50"
+                disabled={!!busy}
+                onClick={() => notify("refunded")}
+              >
+                {busy === "refunded" ? "Envoi…" : "Oui, prévenir la cliente"}
+              </button>
+              <button type="button" className="underline" onClick={() => setConfirmRefund(false)}>
+                Annuler
+              </button>
             </span>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline px-4 py-2 text-red-800"
+              disabled={!!busy}
+              onClick={() => setConfirmRefund(true)}
+            >
+              {sent.refunded ? "Renvoyer l'e-mail de remboursement" : "↩ Remboursée — prévenir la cliente"}
+            </button>
           )}
         </div>
-      )}
 
-      <label className="mt-3 flex items-center gap-2">
-        Statut
+        {(sent.shipped || sent.delivered || sent.refunded) && (
+          <ul className="space-y-0.5 text-xs text-muted">
+            {(["shipped", "delivered", "refunded"] as const).map((k) =>
+              sent[k] ? (
+                <li key={k}>
+                  ✉ E-mail {EMAIL_LABELS[k]} envoyé le {sentOn(sent[k])}
+                </li>
+              ) : null,
+            )}
+          </ul>
+        )}
+        {notice && <p className="bg-sand p-2 text-xs">{notice}</p>}
+        {!o.email && (
+          <p className="text-xs text-muted">Pas d&apos;adresse e-mail pour cette commande.</p>
+        )}
+        {o.email && o.tracking_number && (
+          <a href={shippingEmail(o, o.tracking_number)} className="inline-block text-xs text-muted underline underline-offset-4">
+            Ou écrire depuis ma messagerie
+          </a>
+        )}
+      </div>
+
+      <label className="mt-4 flex items-center gap-2 border-t border-line pt-3 text-xs text-muted">
+        Changer le statut sans e-mail
         <select
           value={o.status}
-          disabled={busy}
+          disabled={!!busy}
           onChange={(e) => update({ status: e.target.value })}
           className="field w-auto py-1"
         >
@@ -1259,7 +1336,7 @@ const ORDER_FILTERS = [
   { id: "remboursée", label: "Remboursées" },
 ] as const;
 
-function Orders({ supabase }: { supabase: SupabaseClient }) {
+function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }) {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["id"]>("toutes");
   const [error, setError] = useState<string | null>(null);
@@ -1318,6 +1395,7 @@ function Orders({ supabase }: { supabase: SupabaseClient }) {
           key={o.id}
           order={o}
           supabase={supabase}
+          token={token}
           onChange={() => setVersion((v) => v + 1)}
         />
       ))}

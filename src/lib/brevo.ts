@@ -99,3 +99,107 @@ export async function sendWelcomeEmail(
     htmlContent: html,
   });
 }
+
+/* ------------------------------------------------------------ E-mails de commande */
+
+export type OrderEmailKind = "shipped" | "delivered" | "refunded";
+
+type OrderForEmail = {
+  email: string;
+  customer_name: string | null;
+  amount_total_cents: number;
+  items: { name: string; quantity: number }[];
+  shipping_method: string | null;
+  relay: { name: string; address: string; postcode: string; city: string } | null;
+  tracking_number: string | null;
+};
+
+function emailLayout(title: string, body: string, siteUrl: string) {
+  const brand = escape(SITE.name);
+  return `<!doctype html>
+<html lang="fr"><body style="margin:0;background:#f6f1eb;font-family:Georgia,serif;color:#3b302a">
+  <div style="max-width:560px;margin:0 auto;padding:40px 24px">
+    <p style="text-align:center;font-size:30px;font-style:italic;margin:0 0 32px">${brand}</p>
+    <div style="background:#ffffff;padding:32px 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6">
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:22px;font-style:italic">${title}</p>
+      ${body}
+    </div>
+    <p style="text-align:center;color:#7d6f65;font-size:12px;font-family:Helvetica,Arial,sans-serif;margin:24px 0 0">
+      Une question ? Répondez simplement à cet e-mail ou écrivez à ${escape(SITE.email)}.<br/>
+      ${brand} · <a href="${escape(siteUrl)}" style="color:#7d6f65">${escape(siteUrl.replace(/^https?:\/\//, ""))}</a>
+    </p>
+  </div>
+</body></html>`;
+}
+
+const button = (href: string, label: string) =>
+  `<p style="margin:24px 0 0"><a href="${escape(href)}" style="display:inline-block;background:#3b302a;color:#f6f1eb;text-decoration:none;padding:12px 24px">${escape(label)}</a></p>`;
+
+function itemsList(order: OrderForEmail) {
+  return `<ul style="margin:0 0 16px;padding-left:18px;color:#7d6f65">${order.items
+    .map((it) => `<li>${it.quantity} × ${escape(it.name)}</li>`)
+    .join("")}</ul>`;
+}
+
+/** E-mail à la cliente : commande expédiée, livrée ou remboursée. */
+export async function sendOrderEmail(
+  order: OrderForEmail,
+  kind: OrderEmailKind,
+  siteUrl: string,
+  tracking: { url: string } | null,
+) {
+  const c = config();
+  if (!c) throw new Error("Brevo n'est pas configuré (BREVO_API_KEY manquante dans Vercel).");
+  const first = (order.customer_name ?? "").trim().split(/\s+/)[0];
+  const hello = `<p style="margin:0 0 16px">Bonjour${first ? ` ${escape(first)}` : ""},</p>`;
+  const price = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(
+    order.amount_total_cents / 100,
+  );
+
+  let subject: string;
+  let title: string;
+  let body: string;
+
+  if (kind === "shipped") {
+    const where =
+      order.shipping_method === "relay" && order.relay
+        ? `au point relais <strong>${escape(order.relay.name)}</strong>, ${escape(order.relay.address)}, ${escape(order.relay.postcode)} ${escape(order.relay.city)}. Mondial Relay vous préviendra dès qu'il sera disponible.`
+        : "à l'adresse indiquée lors de votre commande.";
+    subject = `Votre commande ${SITE.name} est en route`;
+    title = "Votre colis est en route !";
+    body = `${hello}
+      <p style="margin:0 0 16px">Bonne nouvelle : votre commande vient d'être expédiée.</p>
+      ${itemsList(order)}
+      <p style="margin:0 0 16px">Elle sera livrée ${where}</p>
+      ${order.tracking_number ? `<p style="margin:0">Numéro de suivi : <strong>${escape(order.tracking_number)}</strong></p>` : ""}
+      ${tracking ? button(tracking.url, "Suivre mon colis") : ""}`;
+  } else if (kind === "delivered") {
+    subject = `Votre commande ${SITE.name} est arrivée`;
+    title = "Votre commande est arrivée";
+    body = `${hello}
+      <p style="margin:0 0 16px">Votre commande a bien été livrée. Nous espérons qu'elle vous plaît !</p>
+      ${itemsList(order)}
+      <p style="margin:0 0 16px">Montrez-nous vos looks sur Instagram en nous identifiant
+      <strong>@${escape(SITE.instagram)}</strong> 🤍</p>
+      <p style="margin:0;color:#7d6f65;font-size:14px">Une pièce ne vous convient pas ? Vous avez 14 jours
+      après réception pour changer d'avis : il suffit de répondre à cet e-mail.</p>
+      ${button(`${siteUrl}/nouveautes`, "Voir les nouveautés")}`;
+  } else {
+    subject = `Votre remboursement ${SITE.name}`;
+    title = "Votre remboursement est en cours";
+    body = `${hello}
+      <p style="margin:0 0 16px">Nous avons procédé au remboursement de votre commande
+      d'un montant de <strong>${price}</strong>.</p>
+      ${itemsList(order)}
+      <p style="margin:0">Le montant apparaîtra sur votre compte d'ici 5 à 10 jours ouvrés,
+      selon votre banque, sur le moyen de paiement utilisé lors de la commande.</p>`;
+  }
+
+  await call("/smtp/email", c.key, {
+    sender: c.sender,
+    replyTo: { email: SITE.email, name: SITE.name },
+    to: [{ email: order.email, ...(order.customer_name ? { name: order.customer_name } : {}) }],
+    subject,
+    htmlContent: emailLayout(title, body, siteUrl),
+  });
+}

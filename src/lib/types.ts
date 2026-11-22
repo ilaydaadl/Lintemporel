@@ -53,5 +53,7 @@ export type Order = {
   phone: string | null;
   tracking_number: string | null;
   shipped_at: string | null;
+  /** Dates d'envoi des e-mails à la cliente. */
+  notifications: Partial<Record<"shipped" | "delivered" | "refunded", string>> | null;
   created_at: string;
 };
