@@ -14,8 +14,26 @@ import {
   SITE,
   trackingUrl,
 } from "@/lib/config";
+import { IDLE, useIdleTimeout } from "@/lib/idle";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { ColorOptions, Order, Product } from "@/lib/types";
+
+type AdminTab = "apercu" | "articles" | "commandes" | "newsletter";
+
+const NAV: { id: AdminTab; label: string; icon: string }[] = [
+  { id: "apercu", label: "Tableau de bord", icon: "M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z" },
+  { id: "articles", label: "Articles", icon: "M8 4 4 7l2 3 2-1v11h8V9l2 1 2-3-4-3h-2a2 2 0 0 1-4 0H8Z" },
+  { id: "commandes", label: "Commandes", icon: "M5 8h14l-1 12H6L5 8Zm4 0V6a3 3 0 0 1 6 0v2" },
+  { id: "newsletter", label: "Newsletter", icon: "M4 6h16v12H4zM4 7l8 6 8-6" },
+];
+
+function AdminIcon({ d, className = "h-[18px] w-[18px]" }: { d: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d={d} />
+    </svg>
+  );
+}
 
 export default function AdminPage() {
   const supabase = getBrowserSupabase();
@@ -24,6 +42,7 @@ export default function AdminPage() {
     userId: string;
     ok: boolean;
   } | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -51,126 +70,350 @@ export default function AdminPage() {
   }, [supabase, userId]);
   const isAdmin = adminCheck && adminCheck.userId === userId ? adminCheck.ok : null;
 
+  // Sécurité : déconnexion après 30 minutes d'inactivité dans l'admin
+  const idle = useIdleTimeout({
+    storageKey: IDLE.admin.key,
+    timeoutMs: IDLE.admin.timeoutMs,
+    warnBeforeMs: IDLE.admin.warnBeforeMs,
+    enabled: !!session && isAdmin === true,
+    onTimeout: () => {
+      setTimedOut(true);
+      supabase?.auth.signOut();
+    },
+  });
+
+  if (!supabase) {
+    return (
+      <p className="p-8">
+        Supabase n&apos;est pas encore connecté. Renseignez les variables
+        d&apos;environnement (voir le fichier README) puis relancez le site.
+      </p>
+    );
+  }
+  if (session === undefined) return <p className="p-8 text-muted">Chargement…</p>;
+  if (!session) return <Login supabase={supabase} timedOut={timedOut} />;
+  if (isAdmin === null) return <p className="p-8 text-muted">Vérification des droits…</p>;
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-20 text-center">
+        <p className="font-display text-3xl">Accès réservé</p>
+        <p className="mt-3 text-muted">
+          Le compte {session.user.email} n&apos;a pas les droits d&apos;administration.
+        </p>
+        <button type="button" className="btn btn-outline mt-6" onClick={() => supabase.auth.signOut()}>
+          Se déconnecter
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
-        <h1 className="font-display text-3xl">{SITE.name} — Administration</h1>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/" className="underline underline-offset-4">
-            Voir la boutique
-          </Link>
-          {session && supabase && (
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => supabase.auth.signOut()}
-            >
+    <>
+      <Dashboard
+        supabase={supabase}
+        token={session.access_token}
+        email={session.user.email ?? ""}
+      />
+      {idle.secondsLeft !== null && (
+        <div role="alertdialog" aria-live="assertive" className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md border border-line bg-white p-5 shadow-2xl sm:left-auto sm:right-6">
+          <p className="font-medium">Toujours là ?</p>
+          <p className="mt-1 text-sm text-muted">
+            Par sécurité, vous allez être déconnectée dans {idle.secondsLeft} s.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button type="button" className="btn btn-dark px-5 py-2" onClick={idle.stayActive}>
+              Rester connectée
+            </button>
+            <button type="button" className="btn btn-outline px-5 py-2" onClick={() => supabase.auth.signOut()}>
               Se déconnecter
             </button>
-          )}
+          </div>
         </div>
-      </div>
-
-      {!supabase ? (
-        <p>
-          Supabase n&apos;est pas encore connecté. Renseignez les variables
-          d&apos;environnement (voir le fichier README) puis relancez le site.
-        </p>
-      ) : session === undefined ? (
-        <p className="text-muted">Chargement…</p>
-      ) : !session ? (
-        <Login supabase={supabase} />
-      ) : isAdmin === null ? (
-        <p className="text-muted">Vérification des droits…</p>
-      ) : !isAdmin ? (
-        <p>
-          Le compte {session.user.email} n&apos;a pas les droits
-          d&apos;administration.
-        </p>
-      ) : (
-        <Dashboard supabase={supabase} token={session.access_token} />
       )}
-    </div>
+    </>
   );
 }
 
-function Login({ supabase }: { supabase: SupabaseClient }) {
+function Login({ supabase, timedOut }: { supabase: SupabaseClient; timedOut: boolean }) {
+  const [mode, setMode] = useState<"login" | "reset">("login");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
     setBusy(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
-    });
-    if (error) setError("E-mail ou mot de passe incorrect.");
+    setInfo(null);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: String(form.get("password")),
+      });
+      if (error) setError("E-mail ou mot de passe incorrect.");
+    } else {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/compte/nouveau-mot-de-passe?retour=/admin`,
+      });
+      if (error) setError("L'envoi n'a pas fonctionné. Réessayez dans quelques minutes.");
+      else setInfo("Si cette adresse correspond à un compte, un lien pour choisir un nouveau mot de passe vient d'être envoyé.");
+    }
     setBusy(false);
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-sm space-y-4">
-      <label className="block text-sm font-normal">
-        E-mail
-        <input name="email" type="email" required autoComplete="email" className="field mt-1" />
-      </label>
-      <label className="block text-sm font-normal">
-        Mot de passe
-        <input
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="field mt-1"
-        />
-      </label>
-      {error && (
-        <p role="alert" className="text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      <button className="btn w-full" disabled={busy}>
-        {busy ? "Connexion…" : "Se connecter"}
-      </button>
-    </form>
+    <div className="flex min-h-screen items-center justify-center bg-sand px-4 py-12">
+      <div className="w-full max-w-sm bg-cream p-8 shadow-[0_20px_60px_-30px_rgba(59,48,42,0.5)]">
+        <p className="font-display text-center text-3xl">{SITE.name}</p>
+        <p className="eyebrow mt-1 text-center text-muted">Administration</p>
+        {timedOut && (
+          <p className="mt-6 bg-sand p-3 text-sm">
+            Vous avez été déconnectée après 30 minutes d&apos;inactivité.
+          </p>
+        )}
+        <form onSubmit={submit} className="mt-6 space-y-4">
+          <label className="block text-sm">
+            E-mail
+            <input name="email" type="email" required autoComplete="email" className="field mt-1 py-3" />
+          </label>
+          {mode === "login" && (
+            <label className="block text-sm">
+              Mot de passe
+              <input name="password" type="password" required autoComplete="current-password" className="field mt-1 py-3" />
+            </label>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-red-800">
+              {error}
+            </p>
+          )}
+          {info && <p className="bg-sand p-3 text-sm">{info}</p>}
+          <button className="btn btn-dark w-full py-3" disabled={busy}>
+            {busy ? "…" : mode === "login" ? "Se connecter" : "Recevoir le lien"}
+          </button>
+        </form>
+        <div className="mt-5 flex justify-between text-sm">
+          <button
+            type="button"
+            className="text-muted underline underline-offset-4 hover:text-ink"
+            onClick={() => {
+              setMode(mode === "login" ? "reset" : "login");
+              setError(null);
+              setInfo(null);
+            }}
+          >
+            {mode === "login" ? "Mot de passe oublié ?" : "Retour à la connexion"}
+          </button>
+          <Link href="/" className="text-muted underline underline-offset-4 hover:text-ink">
+            Boutique
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function Dashboard({
   supabase,
   token,
+  email,
 }: {
   supabase: SupabaseClient;
   token: string;
+  email: string;
 }) {
-  const [tab, setTab] = useState<"articles" | "commandes" | "newsletter">("articles");
+  const [tab, setTab] = useState<AdminTab>("apercu");
   return (
-    <>
-      <div className="mb-6 flex gap-6 text-sm font-normal">
-        {(["articles", "commandes", "newsletter"] as const).map((t) => (
+    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
+      {/* Barre latérale (ordinateur) / barre du haut (mobile) */}
+      <aside className="bg-ink text-cream lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+        <div className="flex items-center justify-between px-5 py-4 lg:block lg:px-6 lg:py-7">
+          <div>
+            <p className="font-display text-2xl leading-none">{SITE.name}</p>
+            <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-cream/50">Administration</p>
+          </div>
+          <Link href="/" className="text-xs text-cream/70 underline underline-offset-4 lg:hidden">
+            Boutique
+          </Link>
+        </div>
+        <nav className="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:px-3 lg:pb-0">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => setTab(n.id)}
+              aria-current={tab === n.id ? "page" : undefined}
+              className={`flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                tab === n.id ? "bg-cream text-ink" : "text-cream/75 hover:bg-cream/10 hover:text-cream"
+              }`}
+            >
+              <AdminIcon d={n.icon} />
+              {n.label}
+            </button>
+          ))}
+        </nav>
+        <div className="hidden border-t border-cream/10 px-6 py-5 text-sm lg:block">
+          <p className="truncate text-xs text-cream/50">{email}</p>
+          <div className="mt-3 flex flex-col gap-2">
+            <Link href="/" className="text-cream/75 hover:text-cream">
+              ↗ Voir la boutique
+            </Link>
+            <button type="button" className="text-left text-cream/75 hover:text-cream" onClick={() => supabase.auth.signOut()}>
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <main className="min-w-0 bg-cream px-4 py-8 sm:px-8 lg:px-10 lg:py-10">
+        <div className="mx-auto max-w-5xl">
+          <h1 className="font-display mb-8 text-4xl">{NAV.find((n) => n.id === tab)?.label}</h1>
+          {tab === "apercu" ? (
+            <Overview supabase={supabase} onNavigate={setTab} />
+          ) : tab === "articles" ? (
+            <Products supabase={supabase} token={token} />
+          ) : tab === "commandes" ? (
+            <Orders supabase={supabase} />
+          ) : (
+            <Newsletter supabase={supabase} />
+          )}
           <button
-            key={t}
             type="button"
-            onClick={() => setTab(t)}
-            className={`border-b pb-1 capitalize ${
-              tab === t ? "border-ink" : "border-transparent text-muted"
-            }`}
+            className="mt-12 text-sm text-muted underline underline-offset-4 lg:hidden"
+            onClick={() => supabase.auth.signOut()}
           >
-            {t}
+            Se déconnecter
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ------------------------------ Tableau de bord ------------------------------ */
+
+function Overview({
+  supabase,
+  onNavigate,
+}: {
+  supabase: SupabaseClient;
+  onNavigate: (tab: AdminTab) => void;
+}) {
+  const [data, setData] = useState<{
+    orders: Order[];
+    products: Product[];
+    subscribers: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("products").select("*"),
+      supabase.from("newsletter_subscribers").select("email", { count: "exact", head: true }),
+    ]).then(([o, p, n]) => {
+      if (!active) return;
+      setData({
+        orders: (o.data as Order[]) ?? [],
+        products: (p.data as Product[]) ?? [],
+        subscribers: n.count ?? 0,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
+
+  if (!data) return <div className="h-40 animate-pulse bg-sand" />;
+
+  const paid = data.orders.filter((o) => o.status !== "remboursée");
+  const revenue = paid.reduce((n, o) => n + o.amount_total_cents, 0);
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthRevenue = paid
+    .filter((o) => new Date(o.created_at) >= monthStart)
+    .reduce((n, o) => n + o.amount_total_cents, 0);
+  const toShip = data.orders.filter((o) => o.status === "payée");
+  const online = data.products.filter((p) => p.is_active);
+  const lowStock = online.filter((p) => p.stock <= 3).sort((a, b) => a.stock - b.stock);
+
+  const stats = [
+    { label: "Ventes du mois", value: formatPrice(monthRevenue), hint: `${formatPrice(revenue)} au total` },
+    { label: "À expédier", value: String(toShip.length), hint: "commandes payées", tab: "commandes" as AdminTab, alert: toShip.length > 0 },
+    { label: "Articles en ligne", value: String(online.length), hint: `${lowStock.length} en stock faible`, tab: "articles" as AdminTab },
+    { label: "Inscrites newsletter", value: String(data.subscribers), hint: "abonnées", tab: "newsletter" as AdminTab },
+  ];
+
+  return (
+    <div className="space-y-10">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            disabled={!s.tab}
+            onClick={() => s.tab && onNavigate(s.tab)}
+            className="border border-line bg-white p-5 text-left transition-shadow enabled:hover:shadow-[0_12px_30px_-20px_rgba(59,48,42,0.5)]"
+          >
+            <p className="text-xs uppercase tracking-wider text-muted">{s.label}</p>
+            <p className={`font-display mt-2 text-4xl leading-none ${s.alert ? "text-red-800" : ""}`}>{s.value}</p>
+            <p className="mt-2 text-xs text-muted">{s.hint}</p>
           </button>
         ))}
       </div>
-      {tab === "articles" ? (
-        <Products supabase={supabase} token={token} />
-      ) : tab === "commandes" ? (
-        <Orders supabase={supabase} />
-      ) : (
-        <Newsletter supabase={supabase} />
-      )}
-    </>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section className="border border-line bg-white p-5">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="font-display text-2xl">À expédier</h2>
+            <button type="button" className="text-sm underline underline-offset-4" onClick={() => onNavigate("commandes")}>
+              Voir les commandes
+            </button>
+          </div>
+          {toShip.length === 0 ? (
+            <p className="text-sm text-muted">Rien à expédier pour le moment ✓</p>
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {toShip.slice(0, 6).map((o) => (
+                <li key={o.id} className="flex justify-between gap-3 py-2.5">
+                  <span className="min-w-0 truncate">
+                    {o.customer_name ?? o.email ?? "Cliente"}
+                    <span className="text-muted"> · {o.shipping_method === "relay" ? "Point relais" : "Domicile"}</span>
+                  </span>
+                  <span className="shrink-0">{formatPrice(o.amount_total_cents)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="border border-line bg-white p-5">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="font-display text-2xl">Stock faible</h2>
+            <button type="button" className="text-sm underline underline-offset-4" onClick={() => onNavigate("articles")}>
+              Voir les articles
+            </button>
+          </div>
+          {lowStock.length === 0 ? (
+            <p className="text-sm text-muted">Tous les articles ont plus de 3 pièces en stock ✓</p>
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {lowStock.slice(0, 6).map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0 truncate">{p.name}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ${p.stock === 0 ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-800"}`}>
+                    {p.stock === 0 ? "Épuisé" : `${p.stock} restant${p.stock > 1 ? "s" : ""}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -195,6 +438,7 @@ function Products({
 }) {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [editing, setEditing] = useState<Product | "new" | null>(null);
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -263,44 +507,99 @@ function Products({
     );
   }
 
+  const q = search.trim().toLowerCase();
+  const visible = (products ?? []).filter(
+    (p) =>
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.category ?? "").toLowerCase().includes(q),
+  );
+
   return (
     <>
-      <button type="button" className="btn mb-6" onClick={() => setEditing("new")}>
-        + Ajouter un article
-      </button>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-0 flex-1">
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un article ou une catégorie"
+            aria-label="Rechercher un article"
+            className="field py-2.5 pl-9"
+          />
+        </div>
+        <button type="button" className="btn btn-dark" onClick={() => setEditing("new")}>
+          + Ajouter un article
+        </button>
+      </div>
       {error && (
         <p role="alert" className="mb-4 text-sm text-red-800">
           {error}
         </p>
       )}
       {!products ? (
-        <p className="text-muted">Chargement…</p>
+        <div className="h-40 animate-pulse bg-sand" />
       ) : products.length === 0 ? (
-        <p className="text-muted">Aucun article pour l&apos;instant.</p>
+        <div className="border border-dashed border-line bg-white/50 p-10 text-center">
+          <p className="font-display text-2xl">Aucun article pour l&apos;instant</p>
+          <p className="mt-1 text-sm text-muted">Ajoutez votre première pièce pour remplir la boutique.</p>
+        </div>
+      ) : visible.length === 0 ? (
+        <p className="text-sm text-muted">Aucun article ne correspond à « {search} ».</p>
       ) : (
-        <ul className="divide-y divide-line border-y border-line">
-          {products.map((p) => (
-            <li key={p.id} className="flex items-center gap-4 py-3">
-              <div className="h-16 w-13 shrink-0 overflow-hidden bg-sand">
+        <ul className="space-y-3">
+          {visible.map((p) => (
+            <li
+              key={p.id}
+              className={`flex flex-wrap items-center gap-4 border border-line bg-white p-3 sm:flex-nowrap ${
+                p.is_active ? "" : "opacity-70"
+              }`}
+            >
+              <div className="h-20 w-16 shrink-0 overflow-hidden bg-sand">
                 {p.images[0] && (
                   <img src={p.images[0]} alt="" className="h-full w-full object-cover" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-normal">{p.name}</p>
-                <p className="text-sm text-muted">
-                  {formatPrice(p.price_cents)} · stock {p.stock}
-                  {!p.is_active && " · hors ligne"}
-                  {p.is_featured && " · coup de cœur"}
-                  {p.is_new && " · nouveauté"}
-                </p>
+                <div className="flex flex-wrap items-baseline gap-x-3">
+                  <p className="truncate font-medium">{p.name}</p>
+                  <p className="text-sm text-muted">{p.category ?? "Sans catégorie"}</p>
+                </div>
+                <p className="mt-0.5 text-sm">{formatPrice(p.price_cents)}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                  <span
+                    className={`rounded-full px-2 py-0.5 ${
+                      p.stock === 0
+                        ? "bg-red-50 text-red-800"
+                        : p.stock <= 3
+                          ? "bg-amber-50 text-amber-800"
+                          : "bg-emerald-50 text-emerald-800"
+                    }`}
+                  >
+                    {p.stock === 0 ? "Épuisé" : `Stock ${p.stock}`}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 ${p.is_active ? "bg-sand" : "bg-ink text-cream"}`}>
+                    {p.is_active ? "En ligne" : "Hors ligne"}
+                  </span>
+                  {p.is_featured && <span className="rounded-full bg-sand px-2 py-0.5">♥ Coup de cœur</span>}
+                  {p.is_new && <span className="rounded-full bg-sand px-2 py-0.5">Nouveauté</span>}
+                  {(p.colors ?? []).length > 0 && (
+                    <span className="rounded-full bg-sand px-2 py-0.5">
+                      {p.colors.length} coloris
+                    </span>
+                  )}
+                </div>
               </div>
               {confirmingId === p.id ? (
-                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
+                <div className="flex w-full flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm sm:w-auto">
                   <span className="text-red-800">Supprimer définitivement ?</span>
                   <button
                     type="button"
-                    className="bg-red-800 px-3 py-1 text-white hover:bg-red-900 disabled:opacity-50"
+                    className="bg-red-800 px-3 py-1.5 text-white hover:bg-red-900 disabled:opacity-50"
                     disabled={deletingId === p.id}
                     onClick={() => remove(p)}
                   >
@@ -316,22 +615,30 @@ function Products({
                   </button>
                 </div>
               ) : (
-                <>
+                <div className="flex w-full justify-end gap-2 sm:w-auto">
+                  <Link
+                    href={`/produit/${p.slug}`}
+                    target="_blank"
+                    className="border border-line px-3 py-1.5 text-sm hover:border-ink"
+                    title="Voir sur la boutique"
+                  >
+                    Voir
+                  </Link>
                   <button
                     type="button"
-                    className="text-sm underline underline-offset-4"
+                    className="border border-ink bg-ink px-3 py-1.5 text-sm text-cream hover:bg-[#2a211c]"
                     onClick={() => setEditing(p)}
                   >
                     Modifier
                   </button>
                   <button
                     type="button"
-                    className="text-sm text-red-800 underline underline-offset-4"
+                    className="border border-line px-3 py-1.5 text-sm text-red-800 hover:border-red-800"
                     onClick={() => setConfirmingId(p.id)}
                   >
                     Supprimer
                   </button>
-                </>
+                </div>
               )}
             </li>
           ))}
@@ -944,8 +1251,17 @@ function OrderCard({
   );
 }
 
+const ORDER_FILTERS = [
+  { id: "toutes", label: "Toutes" },
+  { id: "payée", label: "À expédier" },
+  { id: "expédiée", label: "Expédiées" },
+  { id: "livrée", label: "Livrées" },
+  { id: "remboursée", label: "Remboursées" },
+] as const;
+
 function Orders({ supabase }: { supabase: SupabaseClient }) {
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["id"]>("toutes");
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -971,9 +1287,33 @@ function Orders({ supabase }: { supabase: SupabaseClient }) {
   if (orders.length === 0)
     return <p className="text-muted">Aucune commande pour l&apos;instant.</p>;
 
+  const visible = filter === "toutes" ? orders : orders.filter((o) => o.status === filter);
+
   return (
+    <>
+      <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto">
+        {ORDER_FILTERS.map((f) => {
+          const count =
+            f.id === "toutes" ? orders.length : orders.filter((o) => o.status === f.id).length;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFilter(f.id)}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                filter === f.id ? "border-ink bg-ink text-cream" : "border-line bg-white hover:border-taupe"
+              }`}
+            >
+              {f.label} <span className={filter === f.id ? "text-cream/70" : "text-muted"}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+      {visible.length === 0 && (
+        <p className="text-sm text-muted">Aucune commande dans cette catégorie.</p>
+      )}
     <ul className="space-y-4">
-      {orders.map((o) => (
+      {visible.map((o) => (
         <OrderCard
           key={o.id}
           order={o}
@@ -982,6 +1322,7 @@ function Orders({ supabase }: { supabase: SupabaseClient }) {
         />
       ))}
     </ul>
+    </>
   );
 }
 

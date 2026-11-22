@@ -1,6 +1,7 @@
 import { CartSync } from "@/components/cart-sync";
 import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
+import { SessionGuard } from "@/components/session-guard";
 
 export default function BoutiqueLayout({
   children,
@@ -10,6 +11,7 @@ export default function BoutiqueLayout({
   return (
     <>
       <CartSync />
+      <SessionGuard />
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

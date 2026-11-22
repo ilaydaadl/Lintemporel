@@ -1,12 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useSession } from "@/lib/session";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 
 // Page ouverte depuis le lien « mot de passe oublié » reçu par e-mail.
 export default function NouveauMotDePassePage() {
+  return (
+    <Suspense fallback={<div className="min-h-[60vh]" />}>
+      <NewPasswordForm />
+    </Suspense>
+  );
+}
+
+function NewPasswordForm() {
+  const retour = useSearchParams().get("retour") === "/admin" ? "/admin" : "/compte";
   const { session, ready } = useSession();
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +39,8 @@ export default function NouveauMotDePassePage() {
       {!ready ? null : done ? (
         <p className="mt-8 text-center">
           C&apos;est fait !{" "}
-          <Link href="/compte" className="underline underline-offset-4">
-            Accéder à mon compte
+          <Link href={retour} className="underline underline-offset-4">
+            {retour === "/admin" ? "Retour à l'administration" : "Accéder à mon compte"}
           </Link>
         </p>
       ) : !session ? (
