@@ -24,8 +24,12 @@ function NewPasswordForm() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const password = String(new FormData(e.currentTarget).get("password") ?? "");
+    const form = new FormData(e.currentTarget);
+    const password = String(form.get("password") ?? "");
+    const confirm = String(form.get("confirm") ?? "");
     if (password.length < 8) return setError("Au moins 8 caractères, s'il vous plaît.");
+    if (password !== confirm) return setError("Les deux mots de passe ne sont pas identiques.");
+    setError(null);
     setBusy(true);
     const { error } = await getBrowserSupabase()!.auth.updateUser({ password });
     setBusy(false);
@@ -56,6 +60,11 @@ function NewPasswordForm() {
             Choisissez un nouveau mot de passe
             <input name="password" type="password" required minLength={8} autoComplete="new-password" className="field mt-1 py-3" />
           </label>
+          <label className="block text-sm">
+            Confirmez le nouveau mot de passe
+            <input name="confirm" type="password" required minLength={8} autoComplete="new-password" className="field mt-1 py-3" />
+          </label>
+          <p className="text-xs text-muted">Au moins 8 caractères.</p>
           {error && <p className="text-sm text-red-800">{error}</p>}
           <button className="btn btn-dark w-full py-3.5" disabled={busy}>
             {busy ? "…" : "Enregistrer"}

@@ -73,6 +73,10 @@ function AuthForms() {
         setBusy(false);
         return setError("Choisissez un mot de passe d'au moins 8 caractères.");
       }
+      if (password !== String(form.get("confirm") ?? "")) {
+        setBusy(false);
+        return setError("Les deux mots de passe ne sont pas identiques.");
+      }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -148,6 +152,19 @@ function AuthForms() {
               required
               minLength={mode === "signup" ? 8 : undefined}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              className="field mt-1 py-3"
+            />
+          </label>
+        )}
+        {mode === "signup" && (
+          <label className="block text-sm">
+            Confirmez le mot de passe
+            <input
+              name="confirm"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
               className="field mt-1 py-3"
             />
           </label>
