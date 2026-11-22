@@ -7,6 +7,7 @@ import {
 } from "@/lib/config";
 import { getProductsByIdsFresh } from "@/lib/products";
 import { getServiceSupabase, getStripe } from "@/lib/server-clients";
+import { stockFor, variantKey } from "@/lib/stock";
 import type { Relay } from "@/lib/types";
 
 type Line = {
@@ -106,15 +107,21 @@ export async function POST(req: Request) {
     const colors = product.colors ?? [];
     if (colors.length > 0 && !colors.includes(line.color ?? ""))
       return fail(`Couleur indisponible pour « ${product.name} ».`);
-    wanted.set(line.id, (wanted.get(line.id) ?? 0) + line.quantity);
+    // Quantités demandées par variante (même couleur et même taille)
+    const key = `${line.id}#${variantKey(line.color, line.size)}`;
+    wanted.set(key, (wanted.get(key) ?? 0) + line.quantity);
   }
-  for (const [id, quantity] of wanted) {
+  for (const [key, quantity] of wanted) {
+    const id = key.split("#")[0];
     const product = byId.get(id)!;
-    if (product.stock < quantity) {
+    const line = lines.find((l) => `${l.id}#${variantKey(l.color, l.size)}` === key)!;
+    const available = stockFor(product, line.color, line.size);
+    const choice = [line.color, line.size].filter(Boolean).join(", ");
+    if (available < quantity) {
       return fail(
-        product.stock <= 0
-          ? `« ${product.name} » est épuisé.`
-          : `Il ne reste que ${product.stock} exemplaire(s) de « ${product.name} ».`,
+        available <= 0
+          ? `« ${product.name} »${choice ? ` (${choice})` : ""} est épuisé.`
+          : `Il ne reste que ${available} exemplaire(s) de « ${product.name} »${choice ? ` (${choice})` : ""}.`,
       );
     }
   }

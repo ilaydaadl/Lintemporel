@@ -58,7 +58,13 @@ export async function POST(req: Request) {
       const it = orderItems[Number(w.index)];
       const q = Math.floor(Number(w.quantity));
       return it && q > 0
-        ? { product_id: it.product_id, name: it.name, quantity: Math.min(q, it.quantity) }
+        ? {
+            product_id: it.product_id,
+            name: it.name,
+            quantity: Math.min(q, it.quantity),
+            size: it.size ?? null,
+            color: it.color ?? null,
+          }
         : null;
     })
     .filter((x): x is NonNullable<typeof x> => !!x);

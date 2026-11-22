@@ -23,6 +23,8 @@ export type Product = {
   color_options: ColorOptions;
   category: string | null;
   stock: number;
+  /** Stock par variante « Couleur|Taille » ; vide = stock global. */
+  variant_stock: Record<string, number>;
   is_featured: boolean;
   is_new: boolean;
   is_active: boolean;
@@ -65,7 +67,13 @@ export type ReturnRequest = {
   id: string;
   order_id: string;
   user_id: string | null;
-  items: { product_id: string | null; name: string; quantity: number }[];
+  items: {
+    product_id: string | null;
+    name: string;
+    quantity: number;
+    size?: string | null;
+    color?: string | null;
+  }[];
   reason: string;
   message: string | null;
   status: "en attente" | "acceptée" | "refusée";

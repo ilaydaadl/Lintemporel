@@ -10,6 +10,7 @@ import {
   RETURNS_DAYS,
   SHIPPING,
 } from "@/lib/config";
+import { colorAvailable, sizeAvailable, stockFor } from "@/lib/stock";
 import type { ColorOptions } from "@/lib/types";
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
     colors: string[];
     colorOptions?: ColorOptions;
     stock: number;
+    variantStock?: Record<string, number>;
   };
   initialColor?: string | null;
   onColorChange?: (color: string) => void;
@@ -68,6 +70,17 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
   const [added, setAdded] = useState(false);
   const [missing, setMissing] = useState<string | null>(null);
   const soldOut = product.stock <= 0;
+  // Stock par variante (même forme que l'article en base)
+  const stocked = {
+    stock: product.stock,
+    variant_stock: product.variantStock ?? {},
+    colors: product.colors,
+    sizes: product.sizes,
+  };
+  const ready =
+    (product.colors.length === 0 || !!color) && (product.sizes.length === 0 || !!size);
+  const left = ready ? stockFor(stocked, color, size) : null;
+  const variantSoldOut = left === 0;
   const oneSize =
     product.sizes.length === 1 && /unique/i.test(product.sizes[0] ?? "");
   const modelNote = `La mannequin mesure ${FIT.modelHeight} et porte du ${FIT.modelSize}.`;
@@ -106,8 +119,8 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
               <button
                 key={c}
                 type="button"
-                title={c}
-                aria-label={c}
+                title={colorAvailable(stocked, c) ? c : `${c} — épuisée`}
+                aria-label={colorAvailable(stocked, c) ? c : `${c} (épuisée)`}
                 aria-pressed={color === c}
                 onClick={() => {
                   setColor(c);
@@ -115,14 +128,22 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
                   setMissing(null);
                   setAdded(false);
                 }}
-                className={`rounded-full p-[3px] ring-1 transition ${
+                className={`relative rounded-full p-[3px] ring-1 transition ${
                   color === c ? "ring-ink" : "ring-transparent hover:ring-taupe"
                 }`}
               >
                 <span
-                  className="block h-9 w-9 rounded-full ring-1 ring-ink/15"
+                  className={`block h-9 w-9 rounded-full ring-1 ring-ink/15 ${
+                    colorAvailable(stocked, c) ? "" : "opacity-40"
+                  }`}
                   style={{ backgroundColor: colorHex(c, options) }}
                 />
+                {!colorAvailable(stocked, c) && (
+                  <span
+                    aria-hidden
+                    className="absolute left-1/2 top-1/2 h-px w-10 -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-ink/60"
+                  />
+                )}
               </button>
             ))}
           </div>
@@ -153,6 +174,8 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
                   <button
                     key={s}
                     type="button"
+                    disabled={!sizeAvailable(stocked, s, color)}
+                    title={sizeAvailable(stocked, s, color) ? s : `${s} — épuisée`}
                     onClick={() => {
                       setSize(s);
                       setMissing(null);
@@ -163,7 +186,7 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
                       size === s
                         ? "border-ink bg-ink text-cream"
                         : "border-line bg-white hover:border-taupe"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:border-line disabled:bg-sand disabled:text-muted disabled:line-through`}
                   >
                     {s}
                   </button>
@@ -182,12 +205,19 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
           type="button"
           className="btn btn-dark w-full py-4"
           onClick={add}
-          disabled={soldOut}
+          disabled={soldOut || variantSoldOut}
         >
           {soldOut
             ? "Épuisé"
-            : `Ajouter au panier · ${formatPrice(product.priceCents)}`}
+            : variantSoldOut
+              ? "Épuisé dans ce choix"
+              : `Ajouter au panier · ${formatPrice(product.priceCents)}`}
         </button>
+        {left !== null && left > 0 && left <= 3 && (
+          <p className="mt-2 text-center text-sm text-red-800">
+            Plus que {left} pièce{left > 1 ? "s" : ""} dans ce choix
+          </p>
+        )}
         {added && (
           <p className="mt-2 text-center text-sm">
             Ajouté ✓ —{" "}

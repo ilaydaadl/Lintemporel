@@ -15,6 +15,7 @@ create table public.products (
   color_options jsonb not null default '{}',
   category    text,
   stock       integer not null default 0 check (stock >= 0),
+  variant_stock jsonb not null default '{}',  -- stock par « Couleur|Taille »
   is_featured boolean not null default false,
   is_new      boolean not null default false,
   is_active   boolean not null default true,

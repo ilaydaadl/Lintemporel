@@ -16,6 +16,7 @@ import {
   trackingUrl,
 } from "@/lib/config";
 import { IDLE, useIdleTimeout } from "@/lib/idle";
+import { allVariants } from "@/lib/stock";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import type { ColorOptions, Order, Product, ReturnRequest } from "@/lib/types";
 
@@ -665,6 +666,24 @@ function ProductForm({
 }) {
   const [images, setImages] = useState<string[]>(product?.images ?? []);
   const [colors, setColors] = useState<string[]>(product?.colors ?? []);
+  const [sizesText, setSizesText] = useState(product?.sizes.join(", ") ?? "");
+  const sizesList = sizesText
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  // Stock par variante, saisi dans le tableau (texte, pour accepter un champ vide)
+  const [variantInput, setVariantInput] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(product?.variant_stock ?? {}).map(([k, v]) => [k, String(v)]),
+    ),
+  );
+  const combos = allVariants(colors, sizesList);
+  const hasVariants = colors.length > 0 || sizesList.length > 0;
+  const gridFilled = combos.some((c) => (variantInput[c.key] ?? "") !== "");
+  const gridTotal = combos.reduce(
+    (n, c) => n + Math.max(0, Math.floor(Number(variantInput[c.key]) || 0)),
+    0,
+  );
   const [colorOptions, setColorOptions] = useState<ColorOptions>(
     product?.color_options ?? {},
   );
@@ -741,10 +760,7 @@ function ProductForm({
       description: String(form.get("description")).trim(),
       price_cents: Math.round(price * 100),
       category: String(form.get("category")).trim() || null,
-      sizes: String(form.get("sizes"))
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      sizes: sizesList,
       colors,
       color_options: Object.fromEntries(
         colors.map((c) => {
@@ -758,7 +774,18 @@ function ProductForm({
           ];
         }),
       ),
-      stock: Math.max(0, Math.floor(Number(form.get("stock")) || 0)),
+      // Tableau rempli : stock par variante (total = somme). Sinon : stock global.
+      ...(hasVariants && gridFilled
+        ? {
+            variant_stock: Object.fromEntries(
+              combos.map((c) => [c.key, Math.max(0, Math.floor(Number(variantInput[c.key]) || 0))]),
+            ),
+            stock: gridTotal,
+          }
+        : {
+            variant_stock: {},
+            stock: Math.max(0, Math.floor(Number(form.get("stock")) || 0)),
+          }),
       is_featured: form.get("is_featured") === "on",
       is_new: form.get("is_new") === "on",
       is_active: form.get("is_active") === "on",
@@ -798,14 +825,25 @@ function ProductForm({
           />
         </label>
         <label className="block text-sm font-normal">
-          Stock
-          <input
-            name="stock"
-            type="number"
-            min={0}
-            defaultValue={product?.stock ?? 1}
-            className="field mt-1"
-          />
+          {hasVariants && gridFilled ? "Stock total" : "Stock"}
+          {hasVariants && gridFilled ? (
+            <input
+              key="total"
+              type="number"
+              value={gridTotal}
+              disabled
+              className="field mt-1 bg-sand"
+            />
+          ) : (
+            <input
+              key="global"
+              name="stock"
+              type="number"
+              min={0}
+              defaultValue={product?.stock ?? 1}
+              className="field mt-1"
+            />
+          )}
         </label>
         <label className="block text-sm font-normal">
           Catégorie
@@ -830,7 +868,8 @@ function ProductForm({
         <input
           name="sizes"
           placeholder="S, M, L"
-          defaultValue={product?.sizes.join(", ") ?? ""}
+          value={sizesText}
+          onChange={(e) => setSizesText(e.target.value)}
           className="field mt-1"
         />
       </label>
@@ -1022,6 +1061,73 @@ function ProductForm({
           </ul>
         )}
       </div>
+
+      {hasVariants && (
+        <div className="border border-line bg-white/50 p-4">
+          <p className="text-sm font-medium">Stock par couleur et taille</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Indiquez le nombre de pièces de chaque combinaison (0 = épuisée). Tant que le
+            tableau est vide, le stock global ci-dessus est utilisé.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="text-sm">
+              <thead>
+                <tr>
+                  <th className="pr-3 text-left text-xs font-normal text-muted">
+                    {colors.length ? "Couleur" : ""}
+                  </th>
+                  {(sizesList.length ? sizesList : ["Stock"]).map((sz) => (
+                    <th key={sz} className="px-1 pb-1 text-center text-xs font-normal text-muted">
+                      {sz}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(colors.length ? colors : [null]).map((c) => (
+                  <tr key={c ?? "-"}>
+                    <td className="py-1 pr-3">
+                      {c && (
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <span
+                            className="h-4 w-4 rounded-full ring-1 ring-ink/15"
+                            style={{ backgroundColor: colorHex(c, colorOptions) }}
+                          />
+                          {c}
+                        </span>
+                      )}
+                    </td>
+                    {(sizesList.length ? sizesList : [null]).map((sz) => {
+                      const key = `${c ?? ""}|${sz ?? ""}`;
+                      return (
+                        <td key={key} className="px-1 py-1">
+                          <input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            aria-label={`Stock ${c ?? ""} ${sz ?? ""}`.trim()}
+                            value={variantInput[key] ?? ""}
+                            onChange={(e) =>
+                              setVariantInput((v) => ({ ...v, [key]: e.target.value }))
+                            }
+                            placeholder="0"
+                            className={`field w-16 px-2 py-1.5 text-center ${
+                              (variantInput[key] ?? "") === "0" ? "bg-red-50" : ""
+                            }`}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {gridFilled && (
+            <p className="mt-2 text-xs text-muted">Total : {gridTotal} pièce{gridTotal > 1 ? "s" : ""}</p>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-6 text-sm font-normal">
         <label className="flex items-center gap-2">

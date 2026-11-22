@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendOrderEmail, type OrderEmailKind } from "@/lib/brevo";
 import { trackingUrl } from "@/lib/config";
 import { getServiceSupabase } from "@/lib/server-clients";
+import { variantKey } from "@/lib/stock";
 
 const STATUS: Record<OrderEmailKind, string> = {
   shipped: "expédiée",
@@ -72,11 +73,14 @@ export async function POST(req: Request) {
     const items = (accepted?.[0]?.items ?? order.items ?? []) as {
       product_id: string | null;
       quantity: number;
+      size?: string | null;
+      color?: string | null;
     }[];
     for (const it of items) {
       if (!it.product_id) continue;
-      await supabase.rpc("increment_stock", {
+      await supabase.rpc("increment_variant_stock", {
         p_product_id: it.product_id,
+        p_key: variantKey(it.color ?? null, it.size ?? null),
         p_quantity: it.quantity,
       });
     }

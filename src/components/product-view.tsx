@@ -87,6 +87,7 @@ export function ProductView({
             colors: product.colors ?? [],
             colorOptions: options,
             stock: product.stock,
+            variantStock: product.variant_stock ?? {},
           }}
           initialColor={initialColor}
           onColorChange={onColorChange}

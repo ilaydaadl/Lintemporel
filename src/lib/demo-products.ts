@@ -8,6 +8,7 @@ const base = {
   color_options: {},
   category: "Pulls",
   stock: 10,
+  variant_stock: {},
   is_active: true,
   is_new: true,
   created_at: "2026-01-01T00:00:00Z",

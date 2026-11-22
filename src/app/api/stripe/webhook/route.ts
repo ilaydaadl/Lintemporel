@@ -2,6 +2,7 @@ import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getServiceSupabase, getStripe } from "@/lib/server-clients";
+import { variantKey } from "@/lib/stock";
 import type { OrderItem } from "@/lib/types";
 
 // Stripe appelle cette adresse quand un paiement aboutit.
@@ -102,8 +103,9 @@ export async function POST(req: Request) {
   if (inserted && inserted.length > 0) {
     for (const item of items) {
       if (!item.product_id) continue;
-      const { error: stockError } = await supabase.rpc("decrement_stock", {
+      const { error: stockError } = await supabase.rpc("decrement_variant_stock", {
         p_product_id: item.product_id,
+        p_key: variantKey(item.color ?? null, item.size ?? null),
         p_quantity: item.quantity,
       });
       if (stockError) console.error("Stock non mis à jour :", stockError.message);
