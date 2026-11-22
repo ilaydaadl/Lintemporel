@@ -132,6 +132,40 @@ export const OFFER = {
   stripeCouponId: "LINTEMPOREL_BIENVENUE",
 };
 
+/** Informations légales (mentions légales, CGV, confidentialité).
+ *  À COMPLÉTER : tant qu'un champ est vide, la page affiche « à compléter » en rouge. */
+export const LEGAL = {
+  /** Nom et prénom de l'entrepreneur·e (ou nom de la société). */
+  ownerName: "",
+  /** Statut juridique. */
+  status: "Entrepreneur individuel (micro-entreprise)",
+  /** Adresse postale du siège (peut être une domiciliation). */
+  address: "",
+  /** Numéro SIRET (14 chiffres). */
+  siret: "",
+  /** Téléphone de contact (obligatoire dans les mentions légales). */
+  phone: "",
+  /** true si franchise en base de TVA (cas habituel en micro-entreprise). */
+  vatExempt: true,
+  /** Numéro de TVA intracommunautaire, si vatExempt est false. */
+  vatNumber: "",
+  /** Médiateur de la consommation (adhésion obligatoire pour vendre aux particuliers). */
+  mediatorName: "",
+  mediatorUrl: "",
+  /** Date de dernière mise à jour des pages légales. */
+  updatedAt: "22 novembre 2026",
+};
+
+/** Hébergeurs (mentions légales et confidentialité). */
+export const HOSTS = {
+  site: {
+    name: "Vercel Inc.",
+    address: "440 N Barranca Ave #4133, Covina, CA 91723, États-Unis",
+    url: "https://vercel.com",
+  },
+  data: { name: "Supabase Inc.", place: "Union européenne (Irlande)", url: "https://supabase.com" },
+};
+
 /** Délai pour changer d'avis, en jours. */
 export const RETURNS_DAYS = 14;
 

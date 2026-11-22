@@ -158,6 +158,15 @@ function AuthForms() {
           </p>
         )}
         {info && <p className="bg-sand p-3 text-sm">{info}</p>}
+        {mode === "signup" && (
+          <p className="text-xs text-muted">
+            En créant un compte, vous acceptez notre{" "}
+            <Link href="/confidentialite" className="underline underline-offset-4 hover:text-ink">
+              politique de confidentialité
+            </Link>
+            .
+          </p>
+        )}
         <button className="btn btn-dark w-full py-3.5" disabled={busy}>
           {busy
             ? "…"

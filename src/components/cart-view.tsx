@@ -411,6 +411,17 @@ export function CartView({ products }: { products: Product[] }) {
               Paiement par carte sur la page sécurisée de Stripe. Vos données
               bancaires ne transitent jamais par notre site.
             </p>
+            <p className="mt-1 text-xs text-muted">
+              En passant commande, vous acceptez nos{" "}
+              <Link href="/cgv" className="underline underline-offset-4 hover:text-ink">
+                conditions générales de vente
+              </Link>{" "}
+              et notre{" "}
+              <Link href="/confidentialite" className="underline underline-offset-4 hover:text-ink">
+                politique de confidentialité
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

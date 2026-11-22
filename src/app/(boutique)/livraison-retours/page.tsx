@@ -35,6 +35,12 @@ export default function LivraisonRetoursPage() {
           Vous avez <span className="text-ink">{RETURNS_DAYS} jours</span> après
           réception pour changer d&apos;avis, sans avoir à vous justifier. Les
           articles doivent être renvoyés non portés, dans leur état d&apos;origine.
+          Les frais de retour sont à votre charge. Le détail de votre droit de
+          rétractation figure dans nos{" "}
+          <Link href="/cgv" className="text-ink underline underline-offset-4">
+            CGV
+          </Link>
+          , avec un formulaire de rétractation.
         </p>
         <p className="mt-3">
           Pour retourner un article, écrivez-nous à{" "}

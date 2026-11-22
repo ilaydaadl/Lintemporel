@@ -105,9 +105,20 @@ export function Footer() {
         <div className="border-t border-cream/10">
           <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-3 px-6 py-5 text-xs text-cream/60 sm:px-8">
             <span>© {SITE.name}</span>
-            <Link href="/a-propos" className="hover:text-cream">
-              À propos
-            </Link>
+            <nav aria-label="Informations légales" className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/mentions-legales" className="hover:text-cream">
+                Mentions légales
+              </Link>
+              <Link href="/cgv" className="hover:text-cream">
+                CGV
+              </Link>
+              <Link href="/confidentialite" className="hover:text-cream">
+                Confidentialité
+              </Link>
+              <Link href="/a-propos" className="hover:text-cream">
+                À propos
+              </Link>
+            </nav>
           </div>
         </div>
       </div>

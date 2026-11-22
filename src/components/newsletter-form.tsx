@@ -109,6 +109,10 @@ export function NewsletterForm() {
       </div>
       <p className="mt-2 text-xs text-muted">
         Recevez votre code −{OFFER.percent} % pour votre première commande.
+        Désinscription en un clic.{" "}
+        <a href="/confidentialite" className="underline underline-offset-4 hover:text-ink">
+          Confidentialité
+        </a>
       </p>
       {state === "error" && (
         <p role="alert" className="mt-2 text-sm text-red-800">
