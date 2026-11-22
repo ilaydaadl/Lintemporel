@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { formatPrice, trackingUrl } from "@/lib/config";
+import {
+  canCancel,
+  canRequestReturn,
+  deliveryDate,
+  formatPrice,
+  LEGAL,
+  ORDER_RULES,
+  RETURN_REASONS,
+  trackingUrl,
+} from "@/lib/config";
 import { useSession } from "@/lib/session";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-import type { Order, Product } from "@/lib/types";
+import type { Order, Product, ReturnRequest } from "@/lib/types";
 import { ProductCard } from "./product-card";
 
 /** Page « Mon compte » : connexion / inscription, puis commandes et favoris. */
@@ -268,7 +277,13 @@ function OrderTimeline({ status }: { status: string }) {
   if (status === "remboursée") {
     return <p className="text-xs text-muted">Commande remboursée</p>;
   }
-  const current = Math.max(0, STEPS.indexOf(status as (typeof STEPS)[number]));
+  if (status === "annulée") {
+    return <p className="text-xs text-muted">Commande annulée — remboursement en cours</p>;
+  }
+  const current =
+    status === "retour demandé" || status === "retour accepté"
+      ? STEPS.length - 1
+      : Math.max(0, STEPS.indexOf(status as (typeof STEPS)[number]));
   return (
     <ol className="grid grid-cols-3 gap-2" aria-label={`Statut : ${status}`}>
       {STEPS.map((step, i) => (
@@ -283,8 +298,88 @@ function OrderTimeline({ status }: { status: string }) {
   );
 }
 
-function OrderCard({ order: o }: { order: Order }) {
+function ReturnStatus({ request }: { request: ReturnRequest }) {
+  const tone =
+    request.status === "acceptée"
+      ? "bg-emerald-50"
+      : request.status === "refusée"
+        ? "bg-red-50"
+        : "bg-sand";
+  return (
+    <div className={`mt-4 p-3 text-sm ${tone}`}>
+      <p className="font-medium">
+        {request.status === "en attente"
+          ? "Demande de retour envoyée — en cours d'examen"
+          : request.status === "acceptée"
+            ? "Retour accepté"
+            : "Retour refusé"}
+      </p>
+      <p className="mt-0.5 text-xs text-muted">
+        {request.items.map((i) => `${i.quantity} × ${i.name}`).join(", ")} · Motif : {request.reason}
+      </p>
+      {request.admin_note && <p className="mt-2 whitespace-pre-line">{request.admin_note}</p>}
+      {request.status === "acceptée" && (
+        <p className="mt-2 text-xs">
+          Renvoyez le ou les articles (non portés) sous 14 jours à : {LEGAL.address}. Le
+          remboursement est effectué dès réception. Les instructions vous ont aussi été envoyées
+          par e-mail.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function OrderCard({
+  order: o,
+  request,
+  onChange,
+}: {
+  order: Order;
+  request?: ReturnRequest;
+  onChange: () => void;
+}) {
+  const { session } = useSession();
+  const [mode, setMode] = useState<"idle" | "cancel" | "return">("idle");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<Record<number, number>>({});
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
   const count = o.items.reduce((n, it) => n + it.quantity, 0);
+  const cancellable = canCancel(o);
+  const returnable = canRequestReturn(o) && !request;
+  const cancelUntil = new Date(
+    new Date(o.created_at).getTime() + ORDER_RULES.cancelHours * 3_600_000,
+  );
+  const delivered = deliveryDate(o);
+  const returnUntil = delivered
+    ? new Date(new Date(delivered).getTime() + ORDER_RULES.returnDays * 86_400_000)
+    : null;
+
+  async function send(path: string, payload: Record<string, unknown>) {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ orderId: o.id, ...payload }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Une erreur est survenue.");
+      setMode("idle");
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <li className="border border-line bg-white/70 p-5 transition-shadow hover:shadow-[0_12px_30px_-20px_rgba(59,48,42,0.45)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -327,6 +422,149 @@ function OrderCard({ order: o }: { order: Order }) {
           </a>
         )}
       </div>
+
+      {request && <ReturnStatus request={request} />}
+
+      {/* Annulation */}
+      {cancellable && mode !== "return" && (
+        <div className="mt-4">
+          {mode === "cancel" ? (
+            <div className="flex flex-wrap items-center gap-3 bg-red-50 p-3 text-sm text-red-900">
+              Annuler cette commande ? Vous serez remboursée.
+              <button
+                type="button"
+                className="bg-red-800 px-3 py-1.5 text-white disabled:opacity-50"
+                disabled={busy}
+                onClick={() => send("/api/account/cancel", {})}
+              >
+                {busy ? "Annulation…" : "Oui, annuler"}
+              </button>
+              <button type="button" className="underline" onClick={() => setMode("idle")}>
+                Non, garder
+              </button>
+            </div>
+          ) : (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <button
+                type="button"
+                className="border border-line bg-white px-3 py-1.5 text-sm text-ink hover:border-ink"
+                onClick={() => setMode("cancel")}
+              >
+                Annuler ma commande
+              </button>
+              Possible jusqu&apos;au{" "}
+              {cancelUntil.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })},
+              tant qu&apos;elle n&apos;est pas expédiée.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Demande de retour */}
+      {returnable && (
+        <div className="mt-4">
+          {mode === "return" ? (
+            <form
+              className="space-y-3 border border-line bg-cream p-4 text-sm"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const items = Object.entries(chosen)
+                  .filter(([, q]) => q > 0)
+                  .map(([index, quantity]) => ({ index: Number(index), quantity }));
+                if (items.length === 0) return setError("Choisissez au moins un article.");
+                if (!reason) return setError("Choisissez un motif.");
+                send("/api/account/return", { items, reason, message });
+              }}
+            >
+              <p className="font-medium">Demander un retour</p>
+              <fieldset>
+                <legend className="mb-1 text-xs text-muted">Articles à retourner</legend>
+                {o.items.map((it, i) => (
+                  <label key={i} className="flex items-center gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      checked={(chosen[i] ?? 0) > 0}
+                      onChange={(e) =>
+                        setChosen((c) => ({ ...c, [i]: e.target.checked ? it.quantity : 0 }))
+                      }
+                      className="accent-[#3b302a]"
+                    />
+                    <span className="flex-1">{it.name}</span>
+                    {it.quantity > 1 && (chosen[i] ?? 0) > 0 && (
+                      <select
+                        value={chosen[i]}
+                        onChange={(e) => setChosen((c) => ({ ...c, [i]: Number(e.target.value) }))}
+                        className="field w-auto py-0.5"
+                        aria-label={`Quantité de ${it.name}`}
+                      >
+                        {Array.from({ length: it.quantity }, (_, k) => k + 1).map((q) => (
+                          <option key={q} value={q}>
+                            {q}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </label>
+                ))}
+              </fieldset>
+              <label className="block">
+                <span className="text-xs text-muted">Motif</span>
+                <select
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="field mt-1 py-2"
+                  required
+                >
+                  <option value="">Choisir un motif…</option>
+                  {RETURN_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs text-muted">
+                  Précisions {reason === "Autre" ? "(obligatoire)" : "(facultatif)"}
+                </span>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  className="field mt-1"
+                />
+              </label>
+              <div className="flex flex-wrap gap-3">
+                <button className="btn btn-dark px-5 py-2" disabled={busy}>
+                  {busy ? "Envoi…" : "Envoyer la demande"}
+                </button>
+                <button type="button" className="btn btn-outline px-5 py-2" onClick={() => setMode("idle")}>
+                  Annuler
+                </button>
+              </div>
+              <p className="text-xs text-muted">
+                Les frais de retour sont à votre charge. Nous vous répondons par e-mail avec la marche à suivre.
+              </p>
+            </form>
+          ) : (
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <button
+                type="button"
+                className="border border-line bg-white px-3 py-1.5 text-sm text-ink hover:border-ink"
+                onClick={() => setMode("return")}
+              >
+                Demander un retour
+              </button>
+              {returnUntil && (
+                <>Possible jusqu&apos;au {returnUntil.toLocaleDateString("fr-FR", { dateStyle: "long" })}.</>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
+      {error && <p className="mt-3 text-sm text-red-800">{error}</p>}
     </li>
   );
 }
@@ -334,6 +572,8 @@ function OrderCard({ order: o }: { order: Order }) {
 function Dashboard({ email, since }: { email: string; since: string | null }) {
   const [tab, setTab] = useState<Tab>("apercu");
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [returns, setReturns] = useState<Record<string, ReturnRequest>>({});
+  const [reload, setReload] = useState(0);
   const [favorites, setFavorites] = useState<Product[] | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const name = firstName(email);
@@ -348,6 +588,16 @@ function Dashboard({ email, since }: { email: string; since: string | null }) {
       .order("created_at", { ascending: false })
       .then(({ data }) => active && setOrders((data as Order[]) ?? []));
     supabase
+      .from("return_requests")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!active) return;
+        const byOrder: Record<string, ReturnRequest> = {};
+        for (const r of (data as ReturnRequest[]) ?? []) byOrder[r.order_id] ??= r;
+        setReturns(byOrder);
+      });
+    supabase
       .from("favorites")
       .select("created_at, products(*)")
       .order("created_at", { ascending: false })
@@ -361,7 +611,7 @@ function Dashboard({ email, since }: { email: string; since: string | null }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reload]);
 
   const lastOrder = orders?.[0];
   const inProgress = orders?.filter((o) => o.status === "payée" || o.status === "expédiée").length ?? 0;
@@ -443,7 +693,7 @@ function Dashboard({ email, since }: { email: string; since: string | null }) {
                   <div className="h-40 animate-pulse bg-sand" />
                 ) : lastOrder ? (
                   <ul>
-                    <OrderCard order={lastOrder} />
+                    <OrderCard order={lastOrder} request={returns[lastOrder.id]} onChange={() => setReload((r) => r + 1)} />
                   </ul>
                 ) : (
                   <EmptyState
@@ -492,7 +742,7 @@ function Dashboard({ email, since }: { email: string; since: string | null }) {
               ) : orders.length > 0 ? (
                 <ul className="space-y-4">
                   {orders.map((o) => (
-                    <OrderCard key={o.id} order={o} />
+                    <OrderCard key={o.id} order={o} request={returns[o.id]} onChange={() => setReload((r) => r + 1)} />
                   ))}
                 </ul>
               ) : (

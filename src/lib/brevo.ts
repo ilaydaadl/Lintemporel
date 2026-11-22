@@ -203,3 +203,105 @@ export async function sendOrderEmail(
     htmlContent: emailLayout(title, body, siteUrl),
   });
 }
+
+/* ------------------------------------------------------------ Annulations et retours */
+
+type SimpleOrder = {
+  id: string;
+  email: string | null;
+  customer_name: string | null;
+  amount_total_cents: number;
+};
+
+const euros = (cents: number) =>
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(cents / 100);
+
+const helloFor = (name: string | null) => {
+  const first = (name ?? "").trim().split(/\s+/)[0];
+  return `<p style="margin:0 0 16px">Bonjour${first ? ` ${escape(first)}` : ""},</p>`;
+};
+
+/** Envoie un e-mail mis en forme aux couleurs de la boutique. */
+async function sendStyled(to: string, subject: string, title: string, body: string, siteUrl: string) {
+  const c = config();
+  if (!c) throw new Error("Brevo n'est pas configuré (BREVO_API_KEY manquante dans Vercel).");
+  await call("/smtp/email", c.key, {
+    sender: c.sender,
+    replyTo: { email: SITE.email, name: SITE.name },
+    to: [{ email: to }],
+    subject,
+    htmlContent: emailLayout(title, body, siteUrl),
+  });
+}
+
+/** Alerte envoyée à la boutique (annulation, demande de retour). */
+export async function sendShopAlert(subject: string, lines: string[], siteUrl: string) {
+  const body = `${lines.map((l) => `<p style="margin:0 0 10px">${l}</p>`).join("")}
+    ${button(`${siteUrl}/admin`, "Ouvrir l'administration")}`;
+  await sendStyled(SITE.email, subject, subject, body, siteUrl);
+}
+
+/** Cliente : confirmation d'annulation de sa commande. */
+export async function sendCancelledEmail(order: SimpleOrder, siteUrl: string) {
+  if (!order.email) return;
+  await sendStyled(
+    order.email,
+    `Annulation de votre commande ${SITE.name}`,
+    "Votre commande est annulée",
+    `${helloFor(order.customer_name)}
+     <p style="margin:0 0 16px">Nous avons bien pris en compte l'annulation de votre commande
+     d'un montant de <strong>${euros(order.amount_total_cents)}</strong>.</p>
+     <p style="margin:0">Vous serez remboursée sur votre moyen de paiement d'origine ; vous
+     recevrez un e-mail de confirmation dès que le remboursement sera effectué.</p>`,
+    siteUrl,
+  );
+}
+
+/** Cliente : accusé de réception de sa demande de retour. */
+export async function sendReturnReceivedEmail(order: SimpleOrder, siteUrl: string) {
+  if (!order.email) return;
+  await sendStyled(
+    order.email,
+    `Votre demande de retour ${SITE.name}`,
+    "Demande de retour reçue",
+    `${helloFor(order.customer_name)}
+     <p style="margin:0">Nous avons bien reçu votre demande de retour. Nous l'étudions et
+     revenons vers vous très vite avec la marche à suivre.</p>`,
+    siteUrl,
+  );
+}
+
+/** Cliente : décision sur sa demande de retour. */
+export async function sendReturnDecisionEmail(
+  order: SimpleOrder,
+  accepted: boolean,
+  note: string | null,
+  returnAddress: string,
+  siteUrl: string,
+) {
+  if (!order.email) return;
+  const noteHtml = note
+    ? `<p style="margin:0 0 16px;padding:12px 16px;background:#f6f1eb">${escape(note).replace(/\n/g, "<br/>")}</p>`
+    : "";
+  const body = accepted
+    ? `${helloFor(order.customer_name)}
+       <p style="margin:0 0 16px">Bonne nouvelle : votre demande de retour est <strong>acceptée</strong>.</p>
+       ${noteHtml}
+       <p style="margin:0 0 8px">Merci de nous renvoyer le ou les articles, non portés et dans leur
+       état d'origine, sous 14 jours, à l'adresse suivante :</p>
+       <p style="margin:0 0 16px"><strong>${escape(SITE.name)}</strong><br/>${escape(returnAddress)}</p>
+       <p style="margin:0;color:#7d6f65;font-size:14px">Les frais de retour sont à votre charge. Pensez à
+       conserver la preuve de dépôt. Le remboursement est effectué dès réception du colis.</p>`
+    : `${helloFor(order.customer_name)}
+       <p style="margin:0 0 16px">Nous avons étudié votre demande de retour et ne pouvons
+       malheureusement pas l'accepter.</p>
+       ${noteHtml}
+       <p style="margin:0">Pour toute question, répondez simplement à cet e-mail.</p>`;
+  await sendStyled(
+    order.email,
+    accepted ? `Votre retour ${SITE.name} est accepté` : `Votre demande de retour ${SITE.name}`,
+    accepted ? "Retour accepté" : "Votre demande de retour",
+    body,
+    siteUrl,
+  );
+}

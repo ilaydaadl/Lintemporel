@@ -56,6 +56,32 @@ export async function POST(req: Request) {
     updates.tracking_number = tracking;
     updates.shipped_at = order.shipped_at ?? now;
   }
+  if (kind === "delivered") updates.delivered_at = order.delivered_at ?? now;
+
+  // Remboursement : remise en stock (une seule fois) des articles concernés —
+  // ceux du retour accepté s'il y en a un, sinon toute la commande (annulation).
+  let restocked = false;
+  if (kind === "refunded" && !order.notifications?.restocked) {
+    const { data: accepted } = await supabase
+      .from("return_requests")
+      .select("items")
+      .eq("order_id", order.id)
+      .eq("status", "acceptée")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const items = (accepted?.[0]?.items ?? order.items ?? []) as {
+      product_id: string | null;
+      quantity: number;
+    }[];
+    for (const it of items) {
+      if (!it.product_id) continue;
+      await supabase.rpc("increment_stock", {
+        p_product_id: it.product_id,
+        p_quantity: it.quantity,
+      });
+    }
+    restocked = true;
+  }
 
   // E-mail à la cliente (la commande est mise à jour même si l'envoi échoue)
   let emailError: string | null = null;
@@ -69,7 +95,11 @@ export async function POST(req: Request) {
         new URL(req.url).origin,
         tracking ? { url: trackingUrl(order.shipping_method, tracking) } : null,
       );
-      updates.notifications = { ...(order.notifications ?? {}), [kind]: now };
+      updates.notifications = {
+        ...(order.notifications ?? {}),
+        [kind]: now,
+        ...(restocked ? { restocked: now } : {}),
+      };
     } catch (e) {
       console.error("E-mail de commande non envoyé :", e);
       emailError =
@@ -79,6 +109,9 @@ export async function POST(req: Request) {
     }
   }
 
+  if (restocked && !updates.notifications) {
+    updates.notifications = { ...(order.notifications ?? {}), restocked: now };
+  }
   const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
   if (error) return reply({ error: error.message }, 500);
 

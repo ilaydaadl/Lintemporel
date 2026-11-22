@@ -53,7 +53,23 @@ export type Order = {
   phone: string | null;
   tracking_number: string | null;
   shipped_at: string | null;
+  delivered_at: string | null;
   /** Dates d'envoi des e-mails à la cliente. */
-  notifications: Partial<Record<"shipped" | "delivered" | "refunded", string>> | null;
+  notifications: Partial<
+    Record<"shipped" | "delivered" | "refunded" | "cancelled" | "restocked", string>
+  > | null;
   created_at: string;
+};
+
+export type ReturnRequest = {
+  id: string;
+  order_id: string;
+  user_id: string | null;
+  items: { product_id: string | null; name: string; quantity: number }[];
+  reason: string;
+  message: string | null;
+  status: "en attente" | "acceptée" | "refusée";
+  admin_note: string | null;
+  created_at: string;
+  decided_at: string | null;
 };

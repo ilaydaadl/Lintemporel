@@ -170,6 +170,63 @@ export const HOSTS = {
 /** Délai pour changer d'avis, en jours. */
 export const RETURNS_DAYS = 14;
 
+/** Annulation et retours depuis l'espace cliente. */
+export const ORDER_RULES = {
+  /** Annulation possible pendant ce délai, et tant que la commande n'est pas expédiée. */
+  cancelHours: 24,
+  /** Demande de retour possible pendant ce délai après la livraison. */
+  returnDays: RETURNS_DAYS,
+};
+
+export const RETURN_REASONS = [
+  "La taille ne me convient pas",
+  "L'article ne correspond pas à la description ou aux photos",
+  "L'article est abîmé ou défectueux",
+  "J'ai reçu un mauvais article",
+  "J'ai changé d'avis",
+  "Autre",
+] as const;
+
+/** Statuts de commande, dans l'ordre du parcours. */
+export const ORDER_STATUSES = [
+  "payée",
+  "annulée",
+  "expédiée",
+  "livrée",
+  "retour demandé",
+  "retour accepté",
+  "remboursée",
+] as const;
+
+/** Une commande peut-elle encore être annulée par la cliente ? */
+export function canCancel(order: { status: string; created_at: string }) {
+  return (
+    order.status === "payée" &&
+    Date.now() - new Date(order.created_at).getTime() < ORDER_RULES.cancelHours * 3_600_000
+  );
+}
+
+/** Date de livraison connue (ou à défaut d'expédition) d'une commande. */
+export function deliveryDate(order: {
+  delivered_at?: string | null;
+  shipped_at?: string | null;
+  notifications?: { delivered?: string } | null;
+}) {
+  return order.delivered_at ?? order.notifications?.delivered ?? order.shipped_at ?? null;
+}
+
+/** Une demande de retour est-elle encore possible ? */
+export function canRequestReturn(order: {
+  status: string;
+  delivered_at?: string | null;
+  shipped_at?: string | null;
+  notifications?: { delivered?: string } | null;
+}) {
+  if (order.status !== "livrée") return false;
+  const d = deliveryDate(order);
+  return !!d && Date.now() - new Date(d).getTime() < ORDER_RULES.returnDays * 86_400_000;
+}
+
 /** Informations taille affichées sur les fiches. */
 export const FIT = {
   /** Tailles couvertes par une « Taille unique ». */

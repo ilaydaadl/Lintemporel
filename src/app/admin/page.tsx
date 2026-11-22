@@ -10,13 +10,14 @@ import {
   colorHex,
   COLORS,
   formatPrice,
+  ORDER_STATUSES,
   paletteHex,
   SITE,
   trackingUrl,
 } from "@/lib/config";
 import { IDLE, useIdleTimeout } from "@/lib/idle";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
-import type { ColorOptions, Order, Product } from "@/lib/types";
+import type { ColorOptions, Order, Product, ReturnRequest } from "@/lib/types";
 
 type AdminTab = "apercu" | "articles" | "commandes" | "newsletter";
 
@@ -337,12 +338,15 @@ function Overview({
     .filter((o) => new Date(o.created_at) >= monthStart)
     .reduce((n, o) => n + o.amount_total_cents, 0);
   const toShip = data.orders.filter((o) => o.status === "payée");
+  const toHandle = data.orders.filter(
+    (o) => o.status === "annulée" || o.status === "retour demandé",
+  );
   const online = data.products.filter((p) => p.is_active);
   const lowStock = online.filter((p) => p.stock <= 3).sort((a, b) => a.stock - b.stock);
 
   const stats = [
     { label: "Ventes du mois", value: formatPrice(monthRevenue), hint: `${formatPrice(revenue)} au total` },
-    { label: "À expédier", value: String(toShip.length), hint: "commandes payées", tab: "commandes" as AdminTab, alert: toShip.length > 0 },
+    { label: "À expédier", value: String(toShip.length), hint: toHandle.length ? `+ ${toHandle.length} annulation(s) ou retour(s) à traiter` : "commandes payées", tab: "commandes" as AdminTab, alert: toShip.length + toHandle.length > 0 },
     { label: "Articles en ligne", value: String(online.length), hint: `${lowStock.length} en stock faible`, tab: "articles" as AdminTab },
     { label: "Inscrites newsletter", value: String(data.subscribers), hint: "abonnées", tab: "newsletter" as AdminTab },
   ];
@@ -1110,13 +1114,107 @@ function sentOn(date: string | undefined) {
     : null;
 }
 
+function ReturnDecision({
+  request,
+  token,
+  onChange,
+}: {
+  request: ReturnRequest;
+  token: string;
+  onChange: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function decide(decision: "acceptée" | "refusée") {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/return-decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ requestId: request.id, decision, note }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Action impossible.");
+      if (!data.emailSent) setError(`Décision enregistrée, mais e-mail non envoyé : ${data.emailError}`);
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action impossible.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tone =
+    request.status === "acceptée" ? "bg-emerald-50" : request.status === "refusée" ? "bg-red-50" : "bg-amber-50";
+  return (
+    <div className={`mt-4 p-4 ${tone}`}>
+      <p className="font-medium">
+        {request.status === "en attente" ? "↩ Demande de retour à traiter" : `Retour ${request.status}`}
+        <span className="ml-2 text-xs font-normal text-muted">
+          le {new Date(request.created_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+        </span>
+      </p>
+      <p className="mt-1">
+        <span className="text-muted">Articles : </span>
+        {request.items.map((i) => `${i.quantity} × ${i.name}`).join(", ")}
+      </p>
+      <p>
+        <span className="text-muted">Motif : </span>
+        {request.reason}
+      </p>
+      {request.message && <p className="mt-1 whitespace-pre-line italic">« {request.message} »</p>}
+      {request.admin_note && (
+        <p className="mt-2 text-xs">
+          <span className="text-muted">Votre réponse : </span>
+          {request.admin_note}
+        </p>
+      )}
+      {request.status === "en attente" && (
+        <div className="mt-3 space-y-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            maxLength={1000}
+            placeholder="Message à la cliente (obligatoire pour un refus, facultatif pour une acceptation)"
+            className="field text-sm"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-dark px-4 py-2" disabled={busy} onClick={() => decide("acceptée")}>
+              {busy ? "…" : "Accepter le retour"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline px-4 py-2 text-red-800"
+              disabled={busy || !note.trim()}
+              onClick={() => decide("refusée")}
+            >
+              Refuser
+            </button>
+          </div>
+          <p className="text-xs text-muted">
+            La cliente est prévenue par e-mail. Si vous acceptez, elle reçoit l&apos;adresse de retour ;
+            une fois le colis reçu, remboursez-la dans Stripe puis cliquez sur « Remboursée ».
+          </p>
+        </div>
+      )}
+      {error && <p className="mt-2 text-xs text-red-800">{error}</p>}
+    </div>
+  );
+}
+
 function OrderCard({
   order: o,
+  request,
   supabase,
   token,
   onChange,
 }: {
   order: Order;
+  request?: ReturnRequest;
   supabase: SupabaseClient;
   token: string;
   onChange: () => void;
@@ -1132,8 +1230,9 @@ function OrderCard({
   // (Après livraison, le remboursement reste possible pour un retour sous 14 jours.)
   const refunded = o.status === "remboursée";
   const delivered = o.status === "livrée";
-  const lockShipped = refunded || delivered;
-  const lockDelivered = refunded || delivered;
+  const inProgress = o.status === "payée" || o.status === "expédiée";
+  const lockShipped = !inProgress;
+  const lockDelivered = !inProgress;
   const lockRefunded = refunded;
   const count = o.items.reduce((n, it) => n + it.quantity, 0);
 
@@ -1199,9 +1298,9 @@ function OrderCard({
         <span className="font-medium">{formatPrice(o.amount_total_cents)}</span>
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs capitalize ${
-            o.status === "payée"
+            o.status === "payée" || o.status === "retour demandé"
               ? "bg-amber-50 text-amber-800"
-              : o.status === "expédiée"
+              : o.status === "expédiée" || o.status === "retour accepté"
                 ? "bg-sky-50 text-sky-800"
                 : o.status === "livrée"
                   ? "bg-emerald-50 text-emerald-800"
@@ -1264,6 +1363,16 @@ function OrderCard({
           </p>
         )}
       </div>
+
+      {request && <ReturnDecision request={request} token={token} onChange={onChange} />}
+      {o.status === "annulée" && (
+        <p className="mt-4 bg-red-50 p-3 text-sm text-red-900">
+          Commande annulée par la cliente
+          {o.notifications?.cancelled &&
+            ` le ${new Date(o.notifications.cancelled).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`}
+          . Remboursez-la dans Stripe, puis cliquez sur « Remboursée ».
+        </p>
+      )}
 
       {/* Actions : chaque bouton change le statut et prévient la cliente */}
       <div className="mt-4 space-y-3 border-t border-line pt-4">
@@ -1347,9 +1456,11 @@ function OrderCard({
         {refunded && (
           <p className="text-xs text-muted">Commande remboursée : plus aucune action possible.</p>
         )}
-        {delivered && (
+        {!inProgress && !refunded && (
           <p className="text-xs text-muted">
-            Commande livrée. Seul le remboursement reste possible, en cas de retour sous 14 jours.
+            {delivered
+              ? "Commande livrée. Seul le remboursement reste possible, en cas de retour sous 14 jours."
+              : "Seul le remboursement reste possible pour cette commande."}
           </p>
         )}
         {(sent.shipped || sent.delivered || sent.refunded) && (
@@ -1382,7 +1493,7 @@ function OrderCard({
           onChange={(e) => update({ status: e.target.value })}
           className="field w-auto py-1"
         >
-          {["payée", "expédiée", "livrée", "remboursée"].map((s) => (
+          {ORDER_STATUSES.map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -1399,6 +1510,9 @@ const ORDER_FILTERS = [
   { id: "payée", label: "À expédier" },
   { id: "expédiée", label: "Expédiées" },
   { id: "livrée", label: "Livrées" },
+  { id: "annulée", label: "Annulées" },
+  { id: "retour demandé", label: "Retours à traiter" },
+  { id: "retour accepté", label: "Retours acceptés" },
   { id: "remboursée", label: "Remboursées" },
 ] as const;
 
@@ -1406,6 +1520,7 @@ function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["id"]>("toutes");
   const [query, setQuery] = useState("");
+  const [returns, setReturns] = useState<Record<string, ReturnRequest>>({});
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -1420,6 +1535,16 @@ function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }
         if (!active) return;
         if (error) setError(error.message);
         else setOrders(data as Order[]);
+      });
+    supabase
+      .from("return_requests")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!active) return;
+        const byOrder: Record<string, ReturnRequest> = {};
+        for (const r of (data as ReturnRequest[]) ?? []) byOrder[r.order_id] ??= r;
+        setReturns(byOrder);
       });
     return () => {
       active = false;
@@ -1496,6 +1621,7 @@ function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }
         <OrderCard
           key={o.id}
           order={o}
+          request={returns[o.id]}
           supabase={supabase}
           token={token}
           onChange={() => setVersion((v) => v + 1)}
