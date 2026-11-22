@@ -173,7 +173,7 @@ export const RETURNS_DAYS = 14;
 /** Annulation et retours depuis l'espace cliente. */
 export const ORDER_RULES = {
   /** Annulation possible pendant ce délai, et tant que la commande n'est pas expédiée. */
-  cancelHours: 24,
+  cancelHours: 2,
   /** Demande de retour possible pendant ce délai après la livraison. */
   returnDays: RETURNS_DAYS,
 };
