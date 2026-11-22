@@ -1126,7 +1126,16 @@ function OrderCard({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmRefund, setConfirmRefund] = useState(false);
+  const [open, setOpen] = useState(false);
   const sent = o.notifications ?? {};
+  // Une fois livrée, on ne revient plus à « expédiée » ; une fois remboursée, tout est figé.
+  // (Après livraison, le remboursement reste possible pour un retour sous 14 jours.)
+  const refunded = o.status === "remboursée";
+  const delivered = o.status === "livrée";
+  const lockShipped = refunded || delivered;
+  const lockDelivered = refunded || delivered;
+  const lockRefunded = refunded;
+  const count = o.items.reduce((n, it) => n + it.quantity, 0);
 
   /** Change le statut et envoie l'e-mail correspondant à la cliente. */
   async function notify(kind: "shipped" | "delivered" | "refunded") {
@@ -1167,18 +1176,54 @@ function OrderCard({
   }
 
   return (
-    <li className="border border-line bg-white p-4 text-sm">
-      <div className="flex flex-wrap justify-between gap-2">
-        <p className="font-medium">
-          {o.customer_name ?? "Client"} · {formatPrice(o.amount_total_cents)}
-        </p>
-        <p className="text-muted">
-          {new Date(o.created_at).toLocaleString("fr-FR", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </p>
-      </div>
+    <li className="border border-line bg-white text-sm">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 p-4 text-left hover:bg-cream/60"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">
+            {o.customer_name ?? o.email ?? "Cliente"}
+          </span>
+          <span className="block text-xs text-muted">
+            {new Date(o.created_at).toLocaleString("fr-FR", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}{" "}
+            · {count} article{count > 1 ? "s" : ""} ·{" "}
+            {o.shipping_method === "relay" ? "Point relais" : o.shipping_method === "home" ? "Domicile" : "Livraison"}
+          </span>
+        </span>
+        <span className="font-medium">{formatPrice(o.amount_total_cents)}</span>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs capitalize ${
+            o.status === "payée"
+              ? "bg-amber-50 text-amber-800"
+              : o.status === "expédiée"
+                ? "bg-sky-50 text-sky-800"
+                : o.status === "livrée"
+                  ? "bg-emerald-50 text-emerald-800"
+                  : "bg-red-50 text-red-800"
+          }`}
+        >
+          {o.status === "payée" ? "à expédier" : o.status}
+        </span>
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+      <div className="border-t border-line p-4">
       <p className="text-muted">
         {[o.email, o.phone].filter(Boolean).join(" · ")}
       </p>
@@ -1229,16 +1274,23 @@ function OrderCard({
               value={tracking}
               onChange={(e) => setTracking(e.target.value)}
               placeholder="Collez le numéro de l'étiquette"
-              className="field mt-1 py-2"
+              disabled={lockShipped}
+              className="field mt-1 py-2 disabled:bg-sand disabled:text-muted"
             />
           </label>
           <button
             type="button"
             className="btn btn-dark px-4 py-2.5"
-            disabled={!!busy || !tracking.trim()}
+            disabled={!!busy || !tracking.trim() || lockShipped}
             onClick={() => notify("shipped")}
           >
-            {busy === "shipped" ? "Envoi…" : sent.shipped ? "Renvoyer l'e-mail d'expédition" : "📦 Expédiée — prévenir la cliente"}
+            {busy === "shipped"
+              ? "Envoi…"
+              : lockShipped
+                ? "📦 Expédiée"
+                : sent.shipped
+                  ? "Renvoyer l'e-mail d'expédition"
+                  : "📦 Expédiée — prévenir la cliente"}
           </button>
         </div>
         {o.tracking_number && (
@@ -1256,10 +1308,14 @@ function OrderCard({
           <button
             type="button"
             className="btn btn-outline px-4 py-2"
-            disabled={!!busy}
+            disabled={!!busy || lockDelivered}
             onClick={() => notify("delivered")}
           >
-            {busy === "delivered" ? "Envoi…" : sent.delivered ? "Renvoyer l'e-mail de livraison" : "✓ Livrée — prévenir la cliente"}
+            {busy === "delivered"
+              ? "Envoi…"
+              : delivered
+                ? "✓ Livrée"
+                : "✓ Livrée — prévenir la cliente"}
           </button>
           {confirmRefund ? (
             <span className="flex flex-wrap items-center gap-2 bg-red-50 px-3 py-2 text-xs text-red-900">
@@ -1280,14 +1336,22 @@ function OrderCard({
             <button
               type="button"
               className="btn btn-outline px-4 py-2 text-red-800"
-              disabled={!!busy}
+              disabled={!!busy || lockRefunded}
               onClick={() => setConfirmRefund(true)}
             >
-              {sent.refunded ? "Renvoyer l'e-mail de remboursement" : "↩ Remboursée — prévenir la cliente"}
+              {refunded ? "↩ Remboursée" : "↩ Remboursée — prévenir la cliente"}
             </button>
           )}
         </div>
 
+        {refunded && (
+          <p className="text-xs text-muted">Commande remboursée : plus aucune action possible.</p>
+        )}
+        {delivered && (
+          <p className="text-xs text-muted">
+            Commande livrée. Seul le remboursement reste possible, en cas de retour sous 14 jours.
+          </p>
+        )}
         {(sent.shipped || sent.delivered || sent.refunded) && (
           <ul className="space-y-0.5 text-xs text-muted">
             {(["shipped", "delivered", "refunded"] as const).map((k) =>
@@ -1324,6 +1388,8 @@ function OrderCard({
         </select>
       </label>
       {error && <p className="mt-2 text-red-800">{error}</p>}
+      </div>
+      )}
     </li>
   );
 }
@@ -1339,6 +1405,7 @@ const ORDER_FILTERS = [
 function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }) {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [filter, setFilter] = useState<(typeof ORDER_FILTERS)[number]["id"]>("toutes");
+  const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -1364,10 +1431,43 @@ function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }
   if (orders.length === 0)
     return <p className="text-muted">Aucune commande pour l&apos;instant.</p>;
 
-  const visible = filter === "toutes" ? orders : orders.filter((o) => o.status === filter);
+  const q = query.trim().toLowerCase();
+  const matches = (o: Order) =>
+    !q ||
+    [
+      o.customer_name,
+      o.email,
+      o.phone,
+      o.tracking_number,
+      o.id,
+      o.relay?.name,
+      o.relay?.city,
+      o.shipping_address?.city,
+      o.shipping_address?.postal_code,
+      ...o.items.map((it) => it.name),
+    ]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  const visible = orders.filter(
+    (o) => (filter === "toutes" || o.status === filter) && matches(o),
+  );
 
   return (
     <>
+      <div className="relative mb-4">
+        <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher : nom, e-mail, téléphone, n° de suivi, article, ville…"
+          aria-label="Rechercher une commande"
+          className="field py-2.5 pl-9"
+        />
+      </div>
       <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto">
         {ORDER_FILTERS.map((f) => {
           const count =
@@ -1387,7 +1487,9 @@ function Orders({ supabase, token }: { supabase: SupabaseClient; token: string }
         })}
       </div>
       {visible.length === 0 && (
-        <p className="text-sm text-muted">Aucune commande dans cette catégorie.</p>
+        <p className="text-sm text-muted">
+          {q ? `Aucune commande ne correspond à « ${query} ».` : "Aucune commande dans cette catégorie."}
+        </p>
       )}
     <ul className="space-y-4">
       {visible.map((o) => (
