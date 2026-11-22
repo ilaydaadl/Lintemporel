@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useCart } from "@/lib/cart";
-import { CATEGORIES, OFFER, SHIPPING, SITE } from "@/lib/config";
+import { OFFER, SHIPPING, SITE } from "@/lib/config";
+import type { CategoryLink } from "@/lib/products";
 
 export function InstagramIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -32,7 +33,13 @@ function navClass(active: boolean) {
   }`;
 }
 
-function DesktopNav({ pathname }: { pathname: string | null }) {
+function DesktopNav({
+  pathname,
+  categories,
+}: {
+  pathname: string | null;
+  categories: CategoryLink[];
+}) {
   return (
     <nav className="hidden items-center gap-6 whitespace-nowrap text-sm font-normal lg:flex xl:gap-8">
       <Link href="/nouveautes" className={navClass(isActive(pathname, "/nouveautes"))}>
@@ -53,7 +60,7 @@ function DesktopNav({ pathname }: { pathname: string | null }) {
             <Link href="/boutique" className="block px-4 py-2 hover:bg-sand">
               Tout voir
             </Link>
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <Link
                 key={c.slug}
                 href={`/boutique/${c.slug}`}
@@ -75,8 +82,8 @@ function DesktopNav({ pathname }: { pathname: string | null }) {
   );
 }
 
-function ActiveDesktopNav() {
-  return <DesktopNav pathname={usePathname()} />;
+function ActiveDesktopNav({ categories }: { categories: CategoryLink[] }) {
+  return <DesktopNav pathname={usePathname()} categories={categories} />;
 }
 
 /** Bandeau défilant (statique si l'utilisateur limite les animations). */
@@ -106,7 +113,7 @@ function AnnouncementBar() {
   );
 }
 
-export function Header() {
+export function Header({ categories }: { categories: CategoryLink[] }) {
   const { count } = useCart();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -130,8 +137,8 @@ export function Header() {
               </svg>
             </button>
             {/* Le lien actif dépend de l'adresse : il s'affiche dès qu'elle est connue */}
-            <Suspense fallback={<DesktopNav pathname={null} />}>
-              <ActiveDesktopNav />
+            <Suspense fallback={<DesktopNav pathname={null} categories={categories} />}>
+              <ActiveDesktopNav categories={categories} />
             </Suspense>
           </div>
 
@@ -201,8 +208,10 @@ export function Header() {
             <Link href="/boutique" onClick={close} className="border-b border-line py-3.5 text-lg font-normal">
               Toute la boutique
             </Link>
-            <p className="eyebrow mt-6 mb-1 text-muted">Catégories</p>
-            {CATEGORIES.map((c) => (
+            {categories.length > 0 && (
+              <p className="eyebrow mt-6 mb-1 text-muted">Catégories</p>
+            )}
+            {categories.map((c) => (
               <Link key={c.slug} href={`/boutique/${c.slug}`} onClick={close} className="py-2.5 font-normal">
                 {c.label}
               </Link>

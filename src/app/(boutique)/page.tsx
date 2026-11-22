@@ -95,7 +95,9 @@ export default async function HomePage() {
   const minPrice = products.length
     ? Math.min(...products.map((p) => p.price_cents))
     : null;
-  const tiles = CATEGORIES.map((c) => ({
+  const tiles = CATEGORIES.filter((c) =>
+    products.some((p) => p.category === c.label),
+  ).map((c) => ({
     ...c,
     image:
       products.find((p) => p.category === c.label && p.images[0])?.images[0] ??
@@ -171,7 +173,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Catégories */}
+      {/* Catégories (seulement celles qui ont des articles) */}
+      {tiles.length > 0 && (
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-8">
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
@@ -182,7 +185,7 @@ export default async function HomePage() {
             Voir toutes les pièces
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-6">
+        <div className={`grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 ${tiles.length >= 6 ? "lg:grid-cols-6" : tiles.length >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           {tiles.map((t) => (
             <Link key={t.slug} href={`/boutique/${t.slug}`} className="group block">
               <div className="flex aspect-[4/5] items-center justify-center overflow-hidden bg-sand text-taupe-dark">
@@ -207,6 +210,7 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* Coups de cœur */}
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-8">

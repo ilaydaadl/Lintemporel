@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { OFFER, SITE } from "@/lib/config";
+import type { CategoryLink } from "@/lib/products";
 import { InstagramIcon } from "./header";
 import { NewsletterForm } from "./newsletter-form";
 
 const linkClass = "text-cream/70 transition-colors hover:text-cream";
 
-export function Footer() {
+export function Footer({ categories }: { categories: CategoryLink[] }) {
   return (
     <footer className="mt-auto">
       {/* Newsletter */}
@@ -39,16 +40,13 @@ export function Footer() {
                   Nouveautés
                 </Link>
               </li>
-              <li>
-                <Link href="/boutique/pulls" className={linkClass}>
-                  Pulls &amp; gilets
-                </Link>
-              </li>
-              <li>
-                <Link href="/boutique/robes" className={linkClass}>
-                  Robes
-                </Link>
-              </li>
+              {categories.map((c) => (
+                <li key={c.slug}>
+                  <Link href={`/boutique/${c.slug}`} className={linkClass}>
+                    {c.label}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link href="/boutique" className={linkClass}>
                   Toute la boutique

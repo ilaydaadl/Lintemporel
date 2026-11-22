@@ -1,7 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 import { cacheLife, cacheTag } from "next/cache";
 import { DEMO_PRODUCTS } from "./demo-products";
+import { CATEGORIES } from "./config";
 import type { Product } from "./types";
+
+export type CategoryLink = { slug: string; label: string };
+
+/** Catégories qui ont au moins un article en ligne (les autres sont masquées). */
+export async function getActiveCategories(): Promise<CategoryLink[]> {
+  const products = await getProducts();
+  return CATEGORIES.filter((c) => products.some((p) => p.category === c.label)).map(
+    (c) => ({ slug: c.slug, label: c.label }),
+  );
+}
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/config";
-import { getProducts } from "@/lib/products";
+import { getActiveCategories, getProducts } from "@/lib/products";
 import { ProductGrid } from "./product-card";
 
 function Chip({
@@ -34,6 +34,7 @@ export async function ShopView({
   activeSlug?: string | null;
 }) {
   const all = await getProducts();
+  const shown = await getActiveCategories();
   const active = CATEGORIES.find((c) => c.slug === activeSlug) ?? null;
   const products = active
     ? all.filter((p) => p.category === active.label)
@@ -55,7 +56,7 @@ export async function ShopView({
         <Chip href="/boutique" active={!active}>
           Tout
         </Chip>
-        {CATEGORIES.map((c) => (
+        {shown.map((c) => (
           <Chip
             key={c.slug}
             href={`/boutique/${c.slug}`}
