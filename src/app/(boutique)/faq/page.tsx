@@ -16,7 +16,7 @@ const QUESTIONS = [
     q: "Combien coûte la livraison ?",
     a: `Point relais Mondial Relay : ${formatPrice(SHIPPING.methods.relay.cents)}, offert dès ${
       SHIPPING.freeFromCents / 100
-    } € d'achat. À domicile (Colissimo) : ${formatPrice(SHIPPING.methods.home.cents)}.`,
+    } € d'achat. À domicile en France (Colissimo) : ${formatPrice(SHIPPING.methods.home.cents)}.`,
   },
   {
     q: "Comment suivre ma commande ?",

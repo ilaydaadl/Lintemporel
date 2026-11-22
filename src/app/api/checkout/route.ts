@@ -171,7 +171,7 @@ export async function POST(req: Request) {
     ...(method === "home"
       ? {
           shipping_address_collection: {
-            allowed_countries: methodInfo.countries as ("FR" | "BE" | "LU" | "CH")[],
+            allowed_countries: methodInfo.countries as ("FR" | "BE" | "LU")[],
           },
         }
       : {

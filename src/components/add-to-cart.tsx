@@ -232,7 +232,7 @@ export function AddToCart({ product, initialColor, onColorChange }: Props) {
             {SHIPPING.freeFromCents / 100} € d&apos;achat ({SHIPPING.methods.relay.delay}).
           </p>
           <p>
-            <span className="text-ink">À domicile (Colissimo)</span> :{" "}
+            <span className="text-ink">À domicile en France (Colissimo)</span> :{" "}
             {formatPrice(SHIPPING.methods.home.cents)} ({SHIPPING.methods.home.delay}).
           </p>
           <p>

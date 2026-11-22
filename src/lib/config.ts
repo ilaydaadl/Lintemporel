@@ -80,12 +80,13 @@ export const SHIPPING = {
       countries: ["FR", "BE", "LU"],
     },
     home: {
-      label: "À domicile (Colissimo)",
+      label: "À domicile en France (Colissimo)",
       short: "À domicile",
       delay: "2 à 3 jours ouvrés",
       cents: 790,
       freeAboveThreshold: false,
-      countries: ["FR", "BE", "LU", "CH"],
+      /** France uniquement : Colissimo vers l'étranger coûte bien plus cher. */
+      countries: ["FR"],
     },
   } satisfies Record<
     ShippingMethod,

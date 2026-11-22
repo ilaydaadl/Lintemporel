@@ -13,13 +13,14 @@ export default function LivraisonRetoursPage() {
         <h2>Livraison</h2>
         <ul className="mt-3 space-y-2">
           <li>
-            <span className="text-ink">Point relais Mondial Relay</span> —{" "}
+            <span className="text-ink">Point relais Mondial Relay</span> (France, Belgique,
+            Luxembourg) —{" "}
             {formatPrice(relay.cents)}, offert dès {SHIPPING.freeFromCents / 100} €
             d&apos;achat. Délai indicatif : {relay.delay}. Vous choisissez votre
             point relais directement dans le panier.
           </li>
           <li>
-            <span className="text-ink">À domicile (Colissimo)</span> —{" "}
+            <span className="text-ink">À domicile en France (Colissimo)</span> —{" "}
             {formatPrice(home.cents)}. Délai indicatif : {home.delay}.
           </li>
         </ul>
